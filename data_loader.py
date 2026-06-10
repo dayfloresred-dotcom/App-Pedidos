@@ -21,6 +21,8 @@ def _extract_num(s):
     return s.replace('Suc. ','').replace('SUC','').strip()
 
 def _load_eans():
+    if not os.path.exists(LISTADO_STOCK_CSV):
+        return {}
     eans = {}
     with open(LISTADO_STOCK_CSV, encoding='latin-1') as f:
         for i, line in enumerate(f):
@@ -109,6 +111,12 @@ def load_productos():
         with open(CACHE_FILE, 'rb') as f:
             _productos = pickle.load(f)
         print(f'[DATA] {len(_productos)} productos cargados desde cache (rápido)')
+        return _productos
+
+    # Si no existe el archivo principal, retornar lista vacía
+    if not os.path.exists(PRESUPUESTO_CSV):
+        print('[DATA] Archivo de presupuesto no encontrado. Subí los archivos desde "Actualizar datos".')
+        _productos = []
         return _productos
 
     print('[DATA] Cargando productos desde archivos CSV (primera vez, puede tardar)...')
