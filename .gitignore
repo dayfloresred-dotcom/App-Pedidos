@@ -1,0 +1,8 @@
+__pycache__/
+*.pkl
+*.db
+*.db-journal
+data/
+*.bat
+*.sh
+cloudflared*

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="alert alert-success d-flex align-items-center gap-3 mb-4">
+      <span style="font-size:2rem">✓</span>
+      <div>
+        <strong>Solicitud confirmada exitosamente</strong><br>
+        <small>Tu pedido fue registrado y está siendo procesado por el área de compras</small>
+      </div>
+    </div>
+    <div class="row g-3 mb-4">
+      <div class="col-4">
+        <div class="bg-light rounded p-3">
+          <div class="small text-muted">Número de pedido</div>
+          <div class="sol-number fs-5">{{ sol.numero }}</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="bg-light rounded p-3">
+          <div class="small text-muted">Fecha de solicitud</div>
+          <div class="fw-bold small">{{ sol.fecha_solicitud }}</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="bg-light rounded p-3">
+          <div class="small text-muted">Fecha de compra</div>
+          <div class="text-muted fst-italic small">Pendiente de compra…</div>
+        </div>
+      </div>
+    </div>
+    <table class="table table-sm">
+      <thead><tr><th>EAN</th><th>Producto</th><th>Laboratorio</th><th class="text-center">Cant.</th></tr></thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td class="text-muted small">{{ it.ean }}</td>
+          <td>{{ it.descripcion }}</td>
+          <td>{{ it.laboratorio }}</td>
+          <td class="text-center fw-bold">{{ it.cantidad }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="d-flex justify-content-between mt-3">
+      <div>
+        {% if sol.estado == 'pendiente' %}
+        <form method="post" action="{{ url_for('cancelar', sol_id=sol.id) }}" style="display:inline"
+              onsubmit="return confirm('¿Seguro que querés cancelar el pedido {{ sol.numero }}?')">
+          <button type="submit" class="btn btn-sm btn-outline-danger">✕ Cancelar pedido</button>
+        </form>
+        {% endif %}
+      </div>
+      <div>
+        <a href="{{ url_for('nueva_solicitud') }}" class="btn btn-sm btn-outline-secondary">← Nueva solicitud</a>
+        <a href="{{ url_for('mis_pedidos') }}" class="btn btn-sm btn-outline-primary ms-2">Ver mis pedidos</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h5 class="mb-1">Actualizar archivos de datos</h5>
+<p class="text-muted small mb-3">Subí los archivos nuevos. Solo los archivos que selecciones se actualizan — el resto queda igual.</p>
+
+<form method="post" enctype="multipart/form-data">
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Archivo</th>
+            <th class="text-center">Estado</th>
+            <th class="text-muted small">Última actualización</th>
+            <th>Subir nuevo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for field, a in archivos.items() %}
+          <tr>
+            <td>
+              {{ a.label }}
+              {% if a.diario %}
+                <span style="background:#fef9c3;color:#854d0e;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px">diario</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if a.existe %}
+                <span style="color:#166534;font-weight:600">✓ OK</span>
+              {% else %}
+                <span style="color:#991b1b;font-weight:600">✗ Falta</span>
+              {% endif %}
+            </td>
+            <td class="text-muted small">{{ a.fecha }}</td>
+            <td>
+              <input type="file" name="{{ field }}" accept="{{ a.accept }}"
+                class="form-control form-control-sm" style="width:280px">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer d-flex gap-2 align-items-center">
+      <button type="submit" class="btn btn-sm text-white" style="background:#2c6e8a">
+        ↑ Actualizar archivos seleccionados
+      </button>
+      <span class="text-muted small">Los productos se recargan automáticamente al subir.</span>
+    </div>
+  </div>
+</form>
+{% endblock %}

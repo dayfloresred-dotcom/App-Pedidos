@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<h5 class="mb-3">
+  {% if session.get('rol') == 'admin' %}Todas las solicitudes{% else %}Mis pedidos{% endif %}
+</h5>
+{% if session.get('rol') == 'admin' %}
+<div class="filter-bar mb-3">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-auto">
+      <select name="suc" class="form-select form-select-sm" style="width:200px">
+        <option value="">Todas las sucursales</option>
+        {% for s in sucursales %}<option value="{{ s }}" {% if filtro_suc==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-sm btn-secondary">Filtrar</button></div>
+    {% if filtro_suc %}<div class="col-auto"><a href="{{ url_for('mis_pedidos') }}" class="btn btn-sm btn-outline-secondary">Limpiar</a></div>{% endif %}
+  </form>
+</div>
+{% endif %}
+<table class="table table-sm table-hover">
+  <thead><tr>
+    <th>N° Pedido</th>
+    {% if session.get('rol') == 'admin' %}<th>Sucursal</th>{% endif %}
+    <th>Fecha solicitud</th><th>Productos</th><th>Fecha de compra</th><th class="text-center">Estado</th>
+  </tr></thead>
+  <tbody>
+    {% for s in solicitudes %}
+    <tr>
+      <td><a href="{{ url_for('ver_solicitud', sol_id=s.id) }}" class="sol-number">{{ s.numero }}</a></td>
+      {% if session.get('rol') == 'admin' %}<td>{{ s.sucursal }}</td>{% endif %}
+      <td>{{ s.fecha_solicitud }}</td>
+      <td class="text-muted">{{ s.n_items }} prod.</td>
+      <td>{% if s.fecha_compra %}{{ s.fecha_compra }}{% else %}<span class="text-muted fst-italic small">Pendiente…</span>{% endif %}</td>
+      <td class="text-center">
+        {% if s.estado == 'comprado' %}
+          <span class="badge-comprado">✓ Pedido realizado</span>
+        {% elif s.estado == 'cancelado' %}
+          <span class="badge-cancelado">✕ Cancelado</span>
+        {% else %}
+          <span class="badge-pendiente">⏳ Pendiente</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="text-center text-muted py-4">No hay solicitudes</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

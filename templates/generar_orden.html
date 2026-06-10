@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+  <h5 class="mb-0">Generar orden de compra</h5>
+  <span class="text-muted small">Fecha: {{ hoy }}</span>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/exportar/SUD" class="btn btn-sm text-white" style="background:#92400e">↓ Exportar SUD (.dds)</a>
+    <a href="/exportar/SUIZO" class="btn btn-sm text-white" style="background:#5b21b6">↓ Exportar SUIZO (.arg)</a>
+  </div>
+</div>
+{% if not orden %}
+  <div class="alert alert-info">No hay solicitudes pendientes para generar orden.</div>
+{% endif %}
+<div class="row g-3">
+  {% for drog, items in orden.items() %}
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center"
+           style="background:{% if drog == 'SUD' %}#fef9ec{% elif drog == 'SUIZO' %}#f5f0ff{% elif drog == 'DROGUERIA RED' %}#e8f4ec{% else %}#f5f5f5{% endif %}">
+        <span class="fw-bold" style="color:{% if drog == 'SUD' %}#92400e{% elif drog == 'SUIZO' %}#5b21b6{% elif drog == 'DROGUERIA RED' %}#166534{% else %}#555{% endif %}">{{ drog }}</span>
+        <span class="small text-muted">{{ items|length }} productos · {{ items|sum(attribute='total') }} u.</span>
+      </div>
+      <div class="card-body p-0" style="max-height:450px;overflow-y:auto">
+        <table class="table table-sm mb-0">
+          <thead><tr>
+            <th>EAN</th><th>Producto</th><th>Sucursales</th>
+            {% if drog == 'DROGUERIA RED' %}<th class="text-center">Stock CD</th><th class="text-center">Alt. droguería</th>{% endif %}
+            <th class="text-center">Solicitado</th><th></th>
+          </tr></thead>
+          <tbody>
+            {% for it in items %}
+            <tr>
+              <td class="text-muted small" style="font-size:11px">{{ it.ean[:13] }}</td>
+              <td style="font-size:12px">
+                {{ it.descripcion[:32] }}
+                {% if it.es_overflow %}<span class="ms-1" style="background:#e0f2fe;color:#075985;font-size:10px;padding:1px 6px;border-radius:8px">excedente CD</span>{% endif %}
+              </td>
+              <td>{{ it.sucursales_str|safe }}</td>
+              {% if drog == 'DROGUERIA RED' %}
+              <td class="text-center fw-bold text-success">{{ it.stock_cd }}</td>
+              <td class="text-center">
+                {% if it.stock_cd < it.total and it.drog_ext %}
+                  <span class="{% if it.drog_ext == 'SUD' %}badge-sud{% else %}badge-suizo{% endif %}">{{ it.drog_ext }}</span>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              {% endif %}
+              <td class="text-center">
+                <input type="number" min="1" value="{{ it.total }}"
+                  class="form-control form-control-sm qty-input"
+                  data-sku="{{ it.sku }}" data-drog="{{ drog }}">
+              </td>
+              <td>
+                <button class="btn btn-sm btn-link text-danger p-0"
+                  onclick="removeItem('{{ drog }}','{{ it.sku }}')">×</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">
+        <button class="btn btn-sm w-100 text-white"
+          style="background:{% if drog == 'SUD' %}#92400e{% elif drog == 'SUIZO' %}#5b21b6{% elif drog == 'DROGUERIA RED' %}#166534{% else %}#555{% endif %}"
+          onclick="marcarComprado('{{ drog }}')">
+          ✓ Marcar {{ drog }} como comprado
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function removeItem(drog, sku) {
+  await fetch('/api/orden/remove', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({drogueria: drog, sku})
+  });
+  location.reload();
+}
+async function marcarComprado(drog) {
+  const hoy = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const res = await fetch('/api/orden/comprado', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({drogueria: drog, fecha: hoy})
+  });
+  const d = await res.json();
+  if (d.ok) {
+    alert(`✓ ${drog} marcado como comprado. ${d.n} solicitud(es) actualizadas.`);
+    location.reload();
+  }
+}
+</script>
+{% endblock %}

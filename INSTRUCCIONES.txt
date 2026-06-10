@@ -1,0 +1,50 @@
+APP PEDIDOS FARMACIAS RED
+=========================
+
+CÓMO INICIAR LA APP
+-------------------
+Windows: Doble clic en "iniciar_app.bat"
+         O desde consola: python app.py
+
+La app se abre en: http://localhost:5000
+
+USUARIOS POR DEFECTO
+--------------------
+Admin:     admin / admin123
+CERRO:     CERRO / cerro123
+RECTA:     RECTA / recta123
+COLON:     COLON / colon123
+... (cada sucursal usa su nombre en minúsculas + 123)
+
+PARA EXPONER A INTERNET (ngrok)
+--------------------------------
+1. Descargar ngrok desde https://ngrok.com/download
+2. Crear cuenta gratuita en ngrok.com
+3. Ejecutar: ngrok config add-authtoken TU_TOKEN
+4. Con la app corriendo, ejecutar en otra consola:
+   ngrok http 5000
+5. Compartir la URL pública con las sucursales
+
+CONFIGURAR MAIL
+---------------
+Editar config.py y completar:
+   MAIL_USERNAME = 'tu_cuenta@gmail.com'
+   MAIL_PASSWORD = 'contraseña_de_aplicacion_google'
+
+Para obtener contraseña de aplicación:
+   1. Ir a myaccount.google.com
+   2. Seguridad → Verificación en 2 pasos → Contraseñas de aplicación
+   3. Crear para "Correo"
+   4. Usar los 16 caracteres generados
+
+ARCHIVOS DE DATOS
+-----------------
+Los archivos CSV/TXT de productos deben estar en:
+C:\Users\d.dartayet\Desktop\Tio Clau\Necesidad Sucursales\
+
+- Presupuesto 04-06-26.csv
+- Listado de Stock 6-4.csv
+- Stock CD.csv
+- precios Sud.txt
+- precios perfu Suizo.xls
+- precios insumos Suizo.xls

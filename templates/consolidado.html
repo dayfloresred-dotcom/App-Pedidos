@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<h5 class="mb-3">Consolidado de solicitudes pendientes</h5>
+<div class="filter-bar mb-3">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-auto">
+      <input type="text" name="lab" class="form-control form-control-sm" placeholder="Laboratorio" value="{{ filtro_lab }}" style="width:180px">
+    </div>
+    <div class="col-auto">
+      <select name="suc" class="form-select form-select-sm" style="width:180px">
+        <option value="">Todas las sucursales</option>
+        {% for s in sucursales %}<option value="{{ s }}" {% if filtro_suc==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="drog" class="form-select form-select-sm">
+        <option value="">Todas las droguerías</option>
+        <option value="DROGUERIA RED" {% if filtro_drog=='DROGUERIA RED' %}selected{% endif %}>DROGUERIA RED</option>
+        <option value="SUD" {% if filtro_drog=='SUD' %}selected{% endif %}>SUD</option>
+        <option value="SUIZO" {% if filtro_drog=='SUIZO' %}selected{% endif %}>SUIZO</option>
+      </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-sm text-white" style="background:#2c6e8a">Filtrar</button></div>
+    <div class="col-auto"><a href="{{ url_for('consolidado') }}" class="btn btn-sm btn-outline-secondary">Limpiar</a></div>
+  </form>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-4"><div class="bg-light rounded p-3"><div class="small text-muted">Productos</div><div class="fs-4 fw-bold">{{ productos|length }}</div></div></div>
+  <div class="col-4"><div class="bg-light rounded p-3"><div class="small text-muted">Sucursales activas</div><div class="fs-4 fw-bold">{{ n_sucursales }}</div></div></div>
+  <div class="col-4"><div class="bg-light rounded p-3"><div class="small text-muted">Unidades totales</div><div class="fs-4 fw-bold">{{ total_unidades }}</div></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header small fw-bold">Productos más solicitados</div>
+      <div class="card-body p-0" style="max-height:500px;overflow-y:auto">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Producto</th><th>Droguería</th><th class="text-center">Total</th></tr></thead>
+          <tbody>
+            {% for p in productos %}
+            <tr style="cursor:pointer" onclick="verDetalle('{{ p.sku }}','{{ p.descripcion|replace("'", "\\'") }}')">
+              <td>{{ p.descripcion[:45] }}</td>
+              <td>
+                {% if p.drogueria == 'DROGUERIA RED' %}<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:8px">CD</span>
+                {% elif p.drogueria == 'SUD' %}<span class="badge-sud">SUD</span>
+                {% elif p.drogueria == 'SUIZO' %}<span class="badge-suizo">SUIZO</span>
+                {% else %}<span class="text-muted small">—</span>{% endif %}
+              </td>
+              <td class="text-center fw-bold">{{ p.total }}</td>
+            </tr>
+            {% endfor %}
+            {% if not productos %}
+            <tr><td colspan="3" class="text-center text-muted py-4">Sin solicitudes pendientes</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header small fw-bold">Detalle por sucursal — <span id="prod-titulo" class="text-muted fw-normal">Hacé clic en un producto</span></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody id="detalle-body"><tr><td class="text-center text-muted py-4">Seleccioná un producto</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function verDetalle(sku, desc) {
+  document.getElementById('prod-titulo').textContent = desc;
+  const res = await fetch(`/api/detalle-sucursal?sku=${encodeURIComponent(sku)}`);
+  const data = await res.json();
+  const tbody = document.getElementById('detalle-body');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td class="text-center text-muted">Sin solicitudes</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(d =>
+    `<tr><td><span class="chip-suc">${d.sucursal}</span></td><td class="text-muted small">${d.cantidad} unidades</td></tr>`
+  ).join('');
+}
+</script>
+{% endblock %}

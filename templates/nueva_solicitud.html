@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block content %}
+<h5 class="mb-3">Nueva solicitud de refuerzo</h5>
+
+{% if session.get('rol') == 'admin' %}
+<div class="mb-3 d-flex align-items-center gap-2 filter-bar">
+  <label class="form-label mb-0 small fw-bold">Crear en nombre de:</label>
+  <select id="sel-sucursal" class="form-select form-select-sm" style="width:220px">
+    <option value="">— Seleccioná una sucursal —</option>
+    {% for s in sucursales %}
+      <option value="{{ s }}">{{ s }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endif %}
+
+<div class="filter-bar">
+  <div class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label small mb-1">Laboratorio</label>
+      <input type="text" id="inp-lab" class="form-control form-control-sm" placeholder="Ej: Unilever" list="lab-list" style="width:200px">
+      <datalist id="lab-list">
+        {% for lab in laboratorios %}
+          <option value="{{ lab }}">
+        {% endfor %}
+      </datalist>
+    </div>
+    <div class="col-auto">
+      <label class="form-label small mb-1">Buscar producto</label>
+      <input type="text" id="inp-q" class="form-control form-control-sm" placeholder="Nombre o EAN" style="width:240px">
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-sm text-white" style="background:#2c6e8a" onclick="buscar()">Buscar</button>
+    </div>
+    <div class="col-auto ms-auto">
+      <button class="btn btn-sm btn-success" onclick="verSolicitud()">
+        Ver solicitud (<span id="count-badge">0</span>)
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="tabla-wrap" class="d-none">
+  <table class="table table-sm table-hover">
+    <thead><tr><th>SKU</th><th>EAN</th><th>Producto</th><th>Laboratorio</th><th class="text-center">Stock real</th><th class="text-center">Stock CD</th><th class="text-center" style="width:100px">Cantidad</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <p class="text-muted small" id="result-count"></p>
+</div>
+
+<!-- Modal revisión -->
+<div class="modal fade" id="modal-revision" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Revisión de solicitud</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-sm">
+          <thead><tr><th>EAN</th><th>Producto</th><th>Laboratorio</th><th class="text-center">Cantidad</th></tr></thead>
+          <tbody id="tbody-revision"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">← Volver a editar</button>
+        <button class="btn btn-sm text-white" style="background:#5a9e6a" onclick="confirmar()">Confirmar solicitud ✓</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const carrito = {};
+const ROL = '{{ session.get("rol") }}';
+
+function getSucursal() {
+  if (ROL === 'admin') return document.getElementById('sel-sucursal').value;
+  return '{{ session.get("username") }}';
+}
+
+async function buscar() {
+  const suc = getSucursal();
+  if (ROL === 'admin' && !suc) { alert('Seleccioná una sucursal primero'); return; }
+  const lab = document.getElementById('inp-lab').value;
+  const q   = document.getElementById('inp-q').value;
+  if (!lab && !q) { alert('Ingresá laboratorio o nombre de producto'); return; }
+  const res  = await fetch(`/api/productos?q=${encodeURIComponent(q)}&lab=${encodeURIComponent(lab)}&suc=${encodeURIComponent(suc)}`);
+  const data = await res.json();
+  renderTabla(data);
+}
+
+function renderTabla(prods) {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  prods.slice(0, 200).forEach(p => {
+    const val = carrito[p.sku] ? carrito[p.sku].cantidad : 0;
+    const desc = p.descripcion.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const lab  = p.laboratorio.replace(/'/g, "\\'");
+    tbody.innerHTML += `<tr>
+      <td class="text-muted small">${p.sku}</td>
+      <td class="text-muted small">${p.ean}</td>
+      <td>${p.descripcion}</td>
+      <td>${p.laboratorio}</td>
+      <td class="text-center">${p.stock_real ?? 0}</td>
+      <td class="text-center" style="font-weight:600;color:${p.stock_cd==='SI'?'#166534':'#991b1b'}">${p.stock_cd ?? 'NO'}</td>
+      <td class="text-center">
+        <input type="number" min="0" class="form-control form-control-sm qty-input"
+          value="${val}"
+          onchange="updateCarrito('${p.sku}','${p.ean}','${desc}','${lab}','${p.drogueria}', this.value)">
+      </td>
+    </tr>`;
+  });
+  document.getElementById('tabla-wrap').classList.remove('d-none');
+  document.getElementById('result-count').textContent = `${prods.length} productos encontrados`;
+}
+
+function updateCarrito(sku, ean, desc, lab, drog, val) {
+  const n = parseInt(val) || 0;
+  if (n > 0) carrito[sku] = {sku, ean, descripcion: desc, laboratorio: lab, drogueria: drog, cantidad: n};
+  else delete carrito[sku];
+  document.getElementById('count-badge').textContent = Object.keys(carrito).length;
+}
+
+function verSolicitud() {
+  const items = Object.values(carrito);
+  if (!items.length) { alert('No agregaste ningún producto'); return; }
+  const tbody = document.getElementById('tbody-revision');
+  tbody.innerHTML = items.map(it =>
+    `<tr><td class="small text-muted">${it.ean}</td><td>${it.descripcion}</td><td>${it.laboratorio}</td><td class="text-center fw-bold">${it.cantidad}</td></tr>`
+  ).join('');
+  new bootstrap.Modal(document.getElementById('modal-revision')).show();
+}
+
+async function confirmar() {
+  const suc = getSucursal();
+  if (!suc) { alert('Seleccioná una sucursal'); return; }
+  const items = Object.values(carrito);
+  const res = await fetch('/api/solicitud', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({sucursal: suc, items})
+  });
+  const data = await res.json();
+  if (data.sol_id) window.location = `/confirmado/${data.sol_id}`;
+  else alert('Error al guardar: ' + (data.error || 'desconocido'));
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') buscar(); });
+</script>
+{% endblock %}
