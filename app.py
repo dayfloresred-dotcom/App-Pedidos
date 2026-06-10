@@ -252,12 +252,10 @@ def actualizar_datos():
     import data_loader
 
     ARCHIVOS = {
-        'presupuesto':       {'label': 'Presupuesto (ventas y stock)', 'path': PRESUPUESTO_CSV,     'accept': '.csv,.txt', 'diario': True},
-        'stock_cd':          {'label': 'Stock CD',                     'path': STOCK_CD_CSV,         'accept': '.csv,.txt', 'diario': True},
-        'listado_stock':     {'label': 'Listado de Stock',             'path': LISTADO_STOCK_CSV,    'accept': '.csv,.txt', 'diario': False},
-        'precios_sud':       {'label': 'Precios SUD',                  'path': PRECIOS_SUD_TXT,      'accept': '.txt',      'diario': False},
-        'precios_suizo_perfu': {'label': 'Precios Suizo Perfumería',   'path': PRECIOS_SUIZO_PERFU,  'accept': '.xls,.xlsx','diario': False},
-        'precios_suizo_ins': {'label': 'Precios Suizo Insumos',        'path': PRECIOS_SUIZO_INS,    'accept': '.xls,.xlsx','diario': False},
+        'presupuesto':         {'label': 'Presupuesto (ventas, stock y stock CD)', 'path': PRESUPUESTO_CSV,    'accept': '.csv,.txt', 'diario': True},
+        'precios_sud':         {'label': 'Precios SUD',                            'path': PRECIOS_SUD_TXT,    'accept': '.txt',      'diario': False},
+        'precios_suizo_perfu': {'label': 'Precios Suizo Perfumería',               'path': PRECIOS_SUIZO_PERFU,'accept': '.xls,.xlsx','diario': False},
+        'precios_suizo_ins':   {'label': 'Precios Suizo Insumos',                  'path': PRECIOS_SUIZO_INS,  'accept': '.xls,.xlsx','diario': False},
     }
 
     if request.method == 'POST':

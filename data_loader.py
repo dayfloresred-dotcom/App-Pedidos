@@ -34,6 +34,8 @@ def _load_eans():
 
 def _load_cd_stock():
     """Returns dict: sku -> cantidad en CD (solo productos con cantidad > 0)"""
+    if not os.path.exists(STOCK_CD_CSV):
+        return {}
     cd = {}
     with open(STOCK_CD_CSV, encoding='latin-1') as f:
         for row in csv.DictReader(f, delimiter=';'):
@@ -45,6 +47,8 @@ def _load_cd_stock():
     return cd
 
 def _load_sud_prices():
+    if not os.path.exists(PRECIOS_SUD_TXT):
+        return {}
     prices = {}
     for enc in ['utf-8-sig', 'latin-1']:
         try:
@@ -66,6 +70,8 @@ def _load_sud_prices():
 def _load_suizo_prices():
     prices = {}
     for fname in [PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS]:
+        if not os.path.exists(fname):
+            continue
         with open(fname, encoding='latin-1') as f:
             for i, line in enumerate(f):
                 if i == 0: continue
@@ -84,6 +90,8 @@ def _load_suizo_prices():
 
 def _load_troqueles_sud():
     """Map EAN -> troquel (7 chars) from SUD price file for .dds export."""
+    if not os.path.exists(PRECIOS_SUD_TXT):
+        return {}
     troqueles = {}
     for enc in ['utf-8-sig', 'latin-1']:
         try:
