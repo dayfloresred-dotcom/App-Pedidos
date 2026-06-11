@@ -30,8 +30,7 @@ def enviar_notificacion(numero, sucursal, items):
     msg.attach(MIMEText('\n'.join(body_lines), 'html'))
 
     try:
-        with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as s:
-            s.starttls()
+        with smtplib.SMTP_SSL(MAIL_SERVER, MAIL_PORT, timeout=10) as s:
             s.login(MAIL_USERNAME, MAIL_PASSWORD)
             s.sendmail(MAIL_USERNAME, MAIL_ADMIN, msg.as_string())
         print(f'[MAIL] Sent notification for {numero}')

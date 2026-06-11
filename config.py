@@ -7,7 +7,7 @@ SECRET_KEY = 'farmacias-red-2026-secret'
 
 # Mail
 MAIL_SERVER   = 'smtp.gmail.com'
-MAIL_PORT     = 587
+MAIL_PORT     = 465
 MAIL_USE_TLS  = True
 MAIL_USERNAME = 'dayflores.red@gmail.com'
 MAIL_PASSWORD = 'koft updi dvzh rchz'
