@@ -206,6 +206,7 @@ def load_productos():
 
                 suc_data       = {}   # necesidad (ventas - stock)
                 suc_stock_real = {}   # stock actual
+                suc_ventas     = {}   # ventas del mes
                 for sname, v_idx in suc_vend.items():
                     s_idx = suc_stock.get(sname)
                     try: ventas = int(float(row[v_idx].replace(',','.'))) if row[v_idx].strip() else 0
@@ -214,6 +215,7 @@ def load_productos():
                     except: stock = 0
                     suc_data[sname]       = max(0, ventas - stock)
                     suc_stock_real[sname] = stock
+                    suc_ventas[sname]     = ventas
 
                 productos.append({
                     'sku':          sku,
@@ -228,6 +230,7 @@ def load_productos():
                     'troquel':      troqueles.get(ean, '0000000'),
                     'necesidad':    suc_data,
                     'stock_real':   suc_stock_real,
+                    'ventas':       suc_ventas,
                 })
 
     _productos = productos

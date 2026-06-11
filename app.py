@@ -181,8 +181,29 @@ def api_crear_solicitud():
 @login_required
 @admin_required
 def api_detalle_sucursal():
-    sku = request.args.get('sku', '')
-    return jsonify(get_detalle_por_sucursal(sku))
+    sku  = request.args.get('sku', '')
+    rows = get_detalle_por_sucursal(sku)
+    prod_map = {p['sku']: p for p in load_productos()}
+    prod = prod_map.get(sku, {})
+    result = []
+    for r in rows:
+        suc = r['sucursal']
+        stock     = prod.get('stock_real', {}).get(suc, 0)
+        necesidad = prod.get('necesidad', {}).get(suc, 0)
+        # ventas field added in v2; fallback: necesidad + stock
+        ventas_map = prod.get('ventas')
+        if ventas_map is not None:
+            ventas = ventas_map.get(suc, 0)
+        else:
+            ventas = necesidad + stock  # reconstruct: necesidad = ventas - stock
+        result.append({
+            'sucursal':  suc,
+            'cantidad':  r['cantidad'],
+            'stock':     stock,
+            'ventas':    ventas,
+            'necesidad': necesidad,
+        })
+    return jsonify(result)
 
 @app.route('/api/orden/remove', methods=['POST'])
 @login_required

@@ -62,6 +62,15 @@
       <div class="card-header small fw-bold">Detalle por sucursal — <span id="prod-titulo" class="text-muted fw-normal">Hacé clic en un producto</span></div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
+          <thead id="detalle-head" style="display:none">
+            <tr>
+              <th>Sucursal</th>
+              <th class="text-center">Pedido</th>
+              <th class="text-center">Stock</th>
+              <th class="text-center">Ventas/mes</th>
+              <th class="text-center">Necesidad</th>
+            </tr>
+          </thead>
           <tbody id="detalle-body"><tr><td class="text-center text-muted py-4">Seleccioná un producto</td></tr></tbody>
         </table>
       </div>
@@ -76,12 +85,21 @@ async function verDetalle(sku, desc) {
   const res = await fetch(`/api/detalle-sucursal?sku=${encodeURIComponent(sku)}`);
   const data = await res.json();
   const tbody = document.getElementById('detalle-body');
+  const thead = document.getElementById('detalle-head');
   if (!data.length) {
+    thead.style.display = 'none';
     tbody.innerHTML = '<tr><td class="text-center text-muted">Sin solicitudes</td></tr>';
     return;
   }
-  tbody.innerHTML = data.map(d =>
-    `<tr><td><span class="chip-suc">${d.sucursal}</span></td><td class="text-muted small">${d.cantidad} unidades</td></tr>`
+  thead.style.display = '';
+  tbody.innerHTML = data.map(d => `
+    <tr>
+      <td><span class="chip-suc">${d.sucursal}</span></td>
+      <td class="text-center fw-bold">${d.cantidad}</td>
+      <td class="text-center">${d.stock}</td>
+      <td class="text-center">${d.ventas}</td>
+      <td class="text-center ${d.necesidad > 0 ? 'text-danger fw-bold' : 'text-success'}">${d.necesidad}</td>
+    </tr>`
   ).join('');
 }
 </script>
