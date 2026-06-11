@@ -235,14 +235,30 @@ def api_marcar_comprado():
 @admin_required
 def exportar(drogueria):
     drog = drogueria.upper()
-    prods = get_consolidado(drogueria_filtro=drog)
-    if not prods:
+    prod_map = {p['sku']: p for p in load_productos()}
+
+    # Items directos con esa droguería
+    prods_directos = get_consolidado(drogueria_filtro=drog)
+
+    # Items excedente CD que van a esa droguería externa
+    prods_cd = get_consolidado(drogueria_filtro='DROGUERIA RED')
+    excedentes = []
+    for p in prods_cd:
+        base     = prod_map.get(p['sku'], {})
+        stock_cd = base.get('stock_cd', 0)
+        if not isinstance(stock_cd, int):
+            stock_cd = 0
+        overflow = p['total'] - stock_cd
+        if overflow > 0 and base.get('drog_ext', '') == drog:
+            excedentes.append({**p, 'total': overflow})
+
+    todos = prods_directos + excedentes
+    if not todos:
         flash(f'No hay productos pendientes para {drog}', 'warning')
         return redirect(url_for('generar_orden'))
 
-    prod_map = {p['sku']: p for p in load_productos()}
     items = []
-    for p in prods:
+    for p in todos:
         base = prod_map.get(p['sku'], {})
         items.append({
             'ean':         p['ean'],

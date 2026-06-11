@@ -53,6 +53,7 @@
               </td>
               <td>
                 <button class="btn btn-sm btn-link text-danger p-0"
+                  data-sku="{{ it.sku }}" data-drog="{{ drog }}"
                   onclick="removeItem('{{ drog }}','{{ it.sku }}')">×</button>
               </td>
             </tr>
@@ -74,13 +75,9 @@
 {% endblock %}
 {% block scripts %}
 <script>
-async function removeItem(drog, sku) {
-  await fetch('/api/orden/remove', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({drogueria: drog, sku})
-  });
-  location.reload();
+function removeItem(drog, sku) {
+  const btn = document.querySelector(`button[data-sku="${sku}"][data-drog="${drog}"]`);
+  if (btn) btn.closest('tr').remove();
 }
 async function marcarComprado(drog) {
   const hoy = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
