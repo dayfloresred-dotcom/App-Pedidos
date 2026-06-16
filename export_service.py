@@ -24,3 +24,17 @@ def generar_sud(items):
         qty     = str(it['cantidad'])
         lines.append(f"{ean}{troquel}{nombre}{qty}")
     return '\n'.join(lines)
+
+def generar_quantio(items):
+    """
+    QUANTIO .csv format (pedido a CD / Droguería Red):
+    EAN;Descripción;Cantidad  (separador ';', terminador CRLF)
+    """
+    lines = []
+    for it in items:
+        ean = (it.get('ean') or '').strip()
+        # El ';' es el delimitador: limpiarlo de la descripción
+        nombre = (it.get('descripcion') or '').replace(';', ' ').strip()
+        qty = str(it['cantidad'])
+        lines.append(f"{ean};{nombre};{qty}")
+    return '\r\n'.join(lines)

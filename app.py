@@ -8,7 +8,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
-from export_service import generar_suizo, generar_sud
+from export_service import generar_suizo, generar_sud, generar_quantio
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -130,6 +130,11 @@ def generar_orden():
         item     = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext, 'es_overflow': False}
         drog     = (p.get('drogueria') or '').upper()
         if drog == 'DROGUERIA RED':
+            # Detalle por sucursal (agregado) para edición y export Quantio
+            det = {}
+            for r in get_detalle_por_sucursal(p['sku']):
+                det[r['sucursal']] = det.get(r['sucursal'], 0) + r['cantidad']
+            item['detalle_suc'] = [{'sucursal': s, 'cantidad': c} for s, c in sorted(det.items())]
             orden['DROGUERIA RED'].append(item)
             # If CD stock insufficient, add overflow order to external droguería
             overflow = p['total'] - stock_cd
@@ -143,8 +148,12 @@ def generar_orden():
         else:
             orden['SIN_PRECIO'].append(item)
 
+    # Sucursales con productos en CD (para el desplegable de export Quantio)
+    sucs_cd = sorted({d['sucursal'] for it in orden['DROGUERIA RED'] for d in it['detalle_suc']})
+
     return render_template('generar_orden.html',
         orden={k: v for k, v in orden.items() if v},
+        sucs_cd=sucs_cd,
         hoy=date.today().strftime('%d/%m/%Y'))
 
 # ── API endpoints ──────────────────────────────────────────────────────────
@@ -230,12 +239,25 @@ def api_marcar_comprado():
     return jsonify({'ok': True, 'n': len(sol_ids)})
 
 # ── Export routes ──────────────────────────────────────────────────────────
-@app.route('/exportar/<drogueria>')
+@app.route('/exportar/<drogueria>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def exportar(drogueria):
     drog = drogueria.upper()
     prod_map = {p['sku']: p for p in load_productos()}
+
+    # Cantidades editadas enviadas desde la UI: {sku: cantidad}
+    overrides = {}
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        for it in data.get('items', []):
+            try:
+                overrides[str(it['sku'])] = max(0, int(it['cantidad']))
+            except (KeyError, ValueError, TypeError):
+                continue
+
+    def qty(p):
+        return overrides.get(str(p['sku']), p['total']) if overrides else p['total']
 
     # Items directos con esa droguería
     prods_directos = get_consolidado(drogueria_filtro=drog)
@@ -259,12 +281,15 @@ def exportar(drogueria):
 
     items = []
     for p in todos:
+        cant = qty(p)
+        if cant <= 0:
+            continue
         base = prod_map.get(p['sku'], {})
         items.append({
             'ean':         p['ean'],
             'troquel':     base.get('troquel', '0000000'),
             'descripcion': p['descripcion'],
-            'cantidad':    p['total'],
+            'cantidad':    cant,
         })
 
     if drog == 'SUIZO':
@@ -277,6 +302,44 @@ def exportar(drogueria):
     return Response(
         content,
         mimetype='application/octet-stream',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+@app.route('/exportar-quantio', methods=['POST'])
+@login_required
+@admin_required
+def exportar_quantio():
+    """Pedido Quantio (CD) por sucursal con cantidades editadas."""
+    data     = request.get_json(silent=True) or {}
+    sucursal = (data.get('sucursal') or '').strip()
+    if not sucursal:
+        return jsonify({'error': 'Falta sucursal'}), 400
+
+    prod_map = {p['sku']: p for p in load_productos()}
+    items = []
+    for it in data.get('items', []):
+        try:
+            cant = max(0, int(it['cantidad']))
+        except (KeyError, ValueError, TypeError):
+            continue
+        if cant <= 0:
+            continue
+        base = prod_map.get(str(it.get('sku')), {})
+        items.append({
+            'ean':         it.get('ean') or base.get('ean', ''),
+            'descripcion': it.get('descripcion') or base.get('descripcion', ''),
+            'cantidad':    cant,
+        })
+
+    if not items:
+        return jsonify({'error': 'Sin productos para esta sucursal'}), 400
+
+    content   = generar_quantio(items)
+    suc_slug  = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
+    filename  = f'quantio_{suc_slug}_{date.today().strftime("%d%m%y")}.csv'
+    return Response(
+        content.encode('latin-1', errors='replace'),
+        mimetype='text/csv',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
 
@@ -331,7 +394,6 @@ def actualizar_datos():
 def forbidden(e):
     return render_template('login.html', error='Acceso denegado'), 403
 
-import os as _os
 init_db()
 seed_users()
 

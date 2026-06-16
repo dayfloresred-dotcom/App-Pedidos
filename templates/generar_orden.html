@@ -3,9 +3,20 @@
 <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
   <h5 class="mb-0">Generar orden de compra</h5>
   <span class="text-muted small">Fecha: {{ hoy }}</span>
-  <div class="ms-auto d-flex gap-2">
-    <a href="/exportar/SUD" class="btn btn-sm text-white" style="background:#92400e">↓ Exportar SUD (.dds)</a>
-    <a href="/exportar/SUIZO" class="btn btn-sm text-white" style="background:#5b21b6">↓ Exportar SUIZO (.arg)</a>
+  <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
+    {% if sucs_cd %}
+    <div class="d-flex gap-1 align-items-center">
+      <select id="quantio-suc" class="form-select form-select-sm" style="width:auto">
+        {% for s in sucs_cd %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-sm text-white" style="background:#166534"
+        onclick="exportQuantio()">↓ Quantio (CD)</button>
+    </div>
+    {% endif %}
+    <button class="btn btn-sm text-white" style="background:#92400e"
+      onclick="exportDrog('SUD')">↓ Exportar SUD (.dds)</button>
+    <button class="btn btn-sm text-white" style="background:#5b21b6"
+      onclick="exportDrog('SUIZO')">↓ Exportar SUIZO (.arg)</button>
   </div>
 </div>
 {% if not orden %}
@@ -32,6 +43,10 @@
             <tr>
               <td class="text-muted small" style="font-size:11px">{{ it.ean[:13] }}</td>
               <td style="font-size:12px">
+                {% if drog == 'DROGUERIA RED' %}
+                <button class="btn btn-sm btn-link p-0 me-1 toggle-det" style="text-decoration:none"
+                  onclick="toggleDet('{{ it.sku }}', this)">▸</button>
+                {% endif %}
                 {{ it.descripcion[:32] }}
                 {% if it.es_overflow %}<span class="ms-1" style="background:#e0f2fe;color:#075985;font-size:10px;padding:1px 6px;border-radius:8px">excedente CD</span>{% endif %}
               </td>
@@ -57,6 +72,23 @@
                   onclick="removeItem('{{ drog }}','{{ it.sku }}')">×</button>
               </td>
             </tr>
+            {% if drog == 'DROGUERIA RED' %}
+            <tr class="detalle-{{ it.sku }}" style="display:none">
+              <td colspan="7" style="background:#f6fbf8">
+                <div class="d-flex flex-wrap gap-3 px-2 py-2">
+                  <span class="small text-muted align-self-center">Cantidad por sucursal:</span>
+                  {% for d in it.detalle_suc %}
+                  <label class="small d-flex align-items-center gap-1">
+                    <span class="text-muted">{{ d.sucursal }}</span>
+                    <input type="number" min="0" value="{{ d.cantidad }}" style="width:62px"
+                      class="form-control form-control-sm qty-cd"
+                      data-sku="{{ it.sku }}" data-sucursal="{{ d.sucursal }}">
+                  </label>
+                  {% endfor %}
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% endfor %}
           </tbody>
         </table>
@@ -76,9 +108,72 @@
 {% block scripts %}
 <script>
 function removeItem(drog, sku) {
-  const btn = document.querySelector(`button[data-sku="${sku}"][data-drog="${drog}"]`);
-  if (btn) btn.closest('tr').remove();
+  const btn = document.querySelector(`button.btn-link[data-sku="${sku}"][data-drog="${drog}"]`);
+  if (btn) {
+    const row = btn.closest('tr');
+    const det = document.querySelector(`.detalle-${CSS.escape(sku)}`);
+    if (det) det.remove();
+    row.remove();
+  }
 }
+
+function toggleDet(sku, btn) {
+  const row = document.querySelector('.detalle-' + CSS.escape(sku));
+  if (!row) return;
+  const show = row.style.display === 'none';
+  row.style.display = show ? '' : 'none';
+  btn.textContent = show ? '▾' : '▸';
+}
+
+async function descargar(url, payload, fallbackName) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    let msg = 'No se pudo generar el archivo.';
+    try { const e = await res.json(); if (e.error) msg = e.error; } catch (_) {}
+    alert(msg);
+    return;
+  }
+  const cd = res.headers.get('Content-Disposition') || '';
+  const m = cd.match(/filename="?([^"]+)"?/);
+  const name = m ? m[1] : fallbackName;
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportDrog(drog) {
+  const items = [];
+  document.querySelectorAll(`.qty-input[data-drog="${drog}"]`).forEach(inp => {
+    const cant = parseInt(inp.value, 10);
+    if (cant > 0) items.push({sku: inp.dataset.sku, cantidad: cant});
+  });
+  if (!items.length) { alert('No hay productos para ' + drog); return; }
+  descargar('/exportar/' + drog, {items}, 'pedido_' + drog.toLowerCase());
+}
+
+function exportQuantio() {
+  const sel = document.getElementById('quantio-suc');
+  if (!sel || !sel.value) { alert('Elegí una sucursal'); return; }
+  const suc = sel.value;
+  const sucAttr = suc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const items = [];
+  document.querySelectorAll(`.qty-cd[data-sucursal="${sucAttr}"]`).forEach(inp => {
+    const cant = parseInt(inp.value, 10);
+    if (cant > 0) items.push({sku: inp.dataset.sku, cantidad: cant});
+  });
+  if (!items.length) { alert('Esa sucursal no tiene productos con stock en CD'); return; }
+  descargar('/exportar-quantio', {sucursal: suc, items}, 'quantio.csv');
+}
+
 async function marcarComprado(drog) {
   const hoy = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
   const res = await fetch('/api/orden/comprado', {
