@@ -8,7 +8,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        get_items_detalle, marcar_item_generado, desmarcar_item_generado,
                        cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal,
                        marcar_comprado_drogueria, marcar_inexistente,
-                       registrar_envio, get_envios, get_envios_sucursal)
+                       registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -357,50 +357,19 @@ def exportar(drogueria):
     drog = drogueria.upper()
     prod_map = {p['sku']: p for p in load_productos()}
 
-    # Cantidades editadas enviadas desde la UI: {sku: cantidad}
-    overrides = {}
-    if request.method == 'POST':
-        data = request.get_json(silent=True) or {}
-        for it in data.get('items', []):
-            try:
-                overrides[str(it['sku'])] = max(0, int(it['cantidad']))
-            except (KeyError, ValueError, TypeError):
-                continue
-
-    def qty(p):
-        return overrides.get(str(p['sku']), p['total']) if overrides else p['total']
-
-    # Items directos con esa droguería
-    prods_directos = get_consolidado(drogueria_filtro=drog)
-
-    # Items excedente CD que van a esa droguería externa
-    prods_cd = get_consolidado(drogueria_filtro='DROGUERIA RED')
-    excedentes = []
-    for p in prods_cd:
-        base     = prod_map.get(p['sku'], {})
-        stock_cd = base.get('stock_cd', 0)
-        if not isinstance(stock_cd, int):
-            stock_cd = 0
-        overflow = p['total'] - stock_cd
-        if overflow > 0 and base.get('drog_ext', '') == drog:
-            excedentes.append({**p, 'total': overflow})
-
-    todos = prods_directos + excedentes
-    if not todos:
-        flash(f'No hay productos pendientes para {drog}', 'warning')
-        return redirect(url_for('generar_orden'))
+    # Usa EXACTAMENTE las cantidades cargadas manualmente con "Enviar" (tabla envios)
+    envios = get_envios_por_drogueria(drog)
+    if not envios:
+        return jsonify({'error': f'No hay cantidades cargadas para {drog}. Cargá las cantidades con "Enviar" en cada sucursal.'}), 400
 
     items = []
-    for p in todos:
-        cant = qty(p)
-        if cant <= 0:
-            continue
-        base = prod_map.get(p['sku'], {})
+    for e in envios:
+        base = prod_map.get(e['sku'], {})
         items.append({
-            'ean':         p['ean'],
+            'ean':         base.get('ean', ''),
             'troquel':     base.get('troquel', '0000000'),
-            'descripcion': p['descripcion'],
-            'cantidad':    cant,
+            'descripcion': base.get('descripcion', ''),
+            'cantidad':    e['total'],
         })
 
     if drog == 'SUIZO':

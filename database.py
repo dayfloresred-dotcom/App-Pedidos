@@ -360,6 +360,16 @@ def get_envios(sucursal, sku):
     conn.close()
     return {r['drogueria']: r['cantidad'] for r in rows}
 
+def get_envios_por_drogueria(drogueria):
+    """Suma de unidades enviadas por producto desde una droguería (para el export)."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT sku, SUM(cantidad) AS tot FROM envios WHERE drogueria=? GROUP BY sku HAVING tot>0",
+        (drogueria,)
+    ).fetchall()
+    conn.close()
+    return [{'sku': r['sku'], 'total': r['tot']} for r in rows]
+
 def get_envios_sucursal(sucursal):
     conn = get_db()
     rows = conn.execute("SELECT sku, drogueria, cantidad FROM envios WHERE sucursal=?", (sucursal,)).fetchall()
