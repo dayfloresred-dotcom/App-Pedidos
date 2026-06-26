@@ -41,19 +41,20 @@
           </tr></thead>
           <tbody>
             {% for it in items %}
+            {% set rid = (drog ~ '_' ~ it.sku)|replace(' ', '') %}
             {% set gens = it.detalle_suc|selectattr('enviado')|list|length %}
             {% set tot = it.detalle_suc|length %}
             <tr>
               <td class="text-muted small" style="font-size:11px">{{ it.ean[:13] }}</td>
               <td style="font-size:12px">
-                {% if not it.es_overflow %}
+                {% if tot > 0 %}
                 <button class="btn btn-sm btn-link p-0 me-1" style="text-decoration:none"
-                  onclick="toggleDet('{{ it.sku }}', this)">▸</button>
+                  onclick="toggleDet('{{ rid }}', this)">&#9656;</button>
                 {% endif %}
                 {{ it.descripcion[:32] }}
                 {% if it.es_overflow %}<span class="ms-1" style="background:#e0f2fe;color:#075985;font-size:10px;padding:1px 6px;border-radius:8px">excedente CD</span>{% endif %}
-                {% if not it.es_overflow and tot > 0 %}
-                <span class="gencount-{{ it.sku }}" style="font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;
+                {% if tot > 0 %}
+                <span class="gencount-{{ rid }}" style="font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;
                   background:{% if gens==tot %}#dcfce7{% elif gens>0 %}#fef9c3{% else %}#f1f5f9{% endif %};
                   color:{% if gens==tot %}#166534{% elif gens>0 %}#854d0e{% else %}#64748b{% endif %}">{{ gens }}/{{ tot }} env.</span>
                 {% endif %}
@@ -65,7 +66,7 @@
                 {% if it.stock_cd < it.total and it.drog_ext %}
                   <span class="{% if it.drog_ext == 'SUD' %}badge-sud{% else %}badge-suizo{% endif %}">{{ it.drog_ext }}</span>
                 {% else %}
-                  <span class="text-muted small">—</span>
+                  <span class="text-muted small">&mdash;</span>
                 {% endif %}
               </td>
               {% endif %}
@@ -77,18 +78,18 @@
               <td>
                 {% if it.es_overflow %}
                 <button class="btn btn-sm btn-link text-secondary p-0" title="Ocultar"
-                  onclick="this.closest('tr').remove()">×</button>
+                  onclick="this.closest('tr').remove()">&times;</button>
                 {% else %}
                 <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar producto (todas las sucursales)"
-                  onclick="cancelarProducto('{{ it.sku }}')">×</button>
+                  onclick="cancelarProducto('{{ it.sku }}')">&times;</button>
                 {% endif %}
               </td>
             </tr>
-            {% if not it.es_overflow %}
-            <tr class="detalle-{{ it.sku }}" style="display:none">
+            {% if tot > 0 %}
+            <tr class="detalle-{{ rid }}" style="display:none">
               <td colspan="{{ ncols }}" style="background:#f6fbf8">
                 <div class="px-2 py-2">
-                  <div class="small text-muted mb-2">Marcá el pedido generado de cada sucursal{% if drog == 'DROGUERIA RED' %} (la cantidad editable es para el archivo Quantio){% endif %}. La ✕ cancela ese producto solo para esa sucursal:</div>
+                  <div class="small text-muted mb-2">Cantidad a enviar de cada sucursal desde <b>{{ it.drog_code }}</b>{% if drog == 'DROGUERIA RED' %} (esta cantidad es tambi&eacute;n la del archivo Quantio){% endif %}. La &times; cancela ese producto para esa sucursal:</div>
                   <div class="d-flex flex-wrap gap-2">
                     {% for d in it.detalle_suc %}
                     <div class="d-flex align-items-center gap-2 border rounded px-2 py-1" style="background:#fff">
@@ -99,11 +100,11 @@
                         data-sku="{{ it.sku }}" data-sucursal="{{ d.sucursal }}" data-code="{{ it.drog_code }}"
                         title="Cantidad a enviar desde {{ it.drog_code }}">
                       <button class="btn btn-sm mark-btn py-0 px-2 {% if d.enviado.get(it.drog_code) %}btn-success{% else %}btn-outline-success{% endif %}"
-                        onclick="enviarItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}', this)">
-                        {% if d.enviado.get(it.drog_code) %}✓ Enviado{% else %}Enviar{% endif %}
+                        onclick="enviarItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}','{{ rid }}', this)">
+                        {% if d.enviado.get(it.drog_code) %}&#10003; Enviado{% else %}Enviar{% endif %}
                       </button>
                       <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar para esta sucursal"
-                        onclick="cancelarSucursal('{{ it.sku }}','{{ d.sucursal }}')">✕</button>
+                        onclick="cancelarSucursal('{{ it.sku }}','{{ d.sucursal }}')">&times;</button>
                     </div>
                     {% endfor %}
                   </div>
@@ -193,7 +194,7 @@ function exportQuantio() {
   descargar('/exportar-quantio', {sucursal: suc, items}, 'quantio.csv');
 }
 
-async function enviarItem(sku, suc, code, btn) {
+async function enviarItem(sku, suc, code, rid, btn) {
   const pill = btn.closest('div');
   const inp  = pill.querySelector('.env-input');
   const cant = parseInt(inp.value, 10) || 0;
@@ -207,24 +208,24 @@ async function enviarItem(sku, suc, code, btn) {
   btn.disabled = false;
   if (res.ok && d.ok) {
     if (cant > 0) {
-      btn.textContent = '✓ Enviado';
+      btn.textContent = '\u2713 Enviado';
       btn.className = 'btn btn-sm mark-btn py-0 px-2 btn-success';
     } else {
       btn.textContent = 'Enviar';
       btn.className = 'btn btn-sm mark-btn py-0 px-2 btn-outline-success';
     }
-    updateGenCount(sku);
+    updateGenCount(rid);
   } else {
     alert(d.error || 'No se pudo registrar el envío.');
   }
 }
 
-function updateGenCount(sku) {
-  const row = document.querySelector('.detalle-' + CSS.escape(sku));
+function updateGenCount(rid) {
+  const row = document.querySelector('.detalle-' + CSS.escape(rid));
   if (!row) return;
   const tot = row.querySelectorAll('button.mark-btn').length;
   const on  = row.querySelectorAll('button.mark-btn.btn-success').length;
-  const badge = document.querySelector('.gencount-' + CSS.escape(sku));
+  const badge = document.querySelector('.gencount-' + CSS.escape(rid));
   if (badge) {
     badge.textContent = on + '/' + tot + ' env.';
     const all = on === tot;
