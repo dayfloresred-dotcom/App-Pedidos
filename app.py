@@ -398,7 +398,7 @@ def exportar_quantio():
         base = prod_map.get(str(it.get('sku')), {})
         items.append({
             'ean':         it.get('ean') or base.get('ean', ''),
-            'descripcion': it.get('descripcion') or base.get('descripcion', ''),
+            'troquel':     base.get('troquel_pres') or base.get('troquel') or '',
             'cantidad':    cant,
         })
 
@@ -407,10 +407,10 @@ def exportar_quantio():
 
     content   = generar_quantio(items)
     suc_slug  = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
-    filename  = f'quantio_{suc_slug}_{date.today().strftime("%d%m%y")}.csv'
+    filename  = f'quantio_{suc_slug}_{date.today().strftime("%d%m%y")}.txt'
     return Response(
         content.encode('latin-1', errors='replace'),
-        mimetype='text/csv',
+        mimetype='text/plain',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
 

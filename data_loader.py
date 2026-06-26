@@ -5,7 +5,8 @@ from config import (PRESUPUESTO_CSV, LISTADO_STOCK_CSV, STOCK_CD_CSV,
 
 RUBROS   = {'Perfumería', 'Accesorios'}
 EXCLUIR  = {'17', '33'}
-CACHE_FILE = os.path.join(BASE_DIR, 'productos_cache.pkl')
+# v2: agrega troquel_pres (Troquel del presupuesto) — el cambio de nombre fuerza regenerar el cache
+CACHE_FILE = os.path.join(BASE_DIR, 'productos_cache_v2.pkl')
 SOURCE_FILES = [PRESUPUESTO_CSV, LISTADO_STOCK_CSV, STOCK_CD_CSV,
                 PRECIOS_SUD_TXT, PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS]
 
@@ -137,11 +138,12 @@ def load_productos():
     suizo_p   = _load_suizo_prices()
     troqueles = _load_troqueles_sud()
 
-    headers    = []
-    header_row = -1
-    suc_vend   = {}
-    suc_stock  = {}
-    cd_col_idx = None   # índice de columna "Cajas Stock CD" en el presupuesto
+    headers     = []
+    header_row  = -1
+    suc_vend    = {}
+    suc_stock   = {}
+    cd_col_idx  = None   # índice de columna "Cajas Stock CD" en el presupuesto
+    troquel_idx = None   # índice de columna "Troquel" en el presupuesto
 
     productos = []
     with open(PRESUPUESTO_CSV, encoding='latin-1') as f:
@@ -155,6 +157,8 @@ def load_productos():
                     h_strip = h.strip()
                     if h_strip == 'Cajas Stock CD':
                         cd_col_idx = idx
+                    elif h_strip == 'Troquel':
+                        troquel_idx = idx
                     elif h.startswith('Cajas Vend'):
                         num = _extract_num(h.replace('Cajas Vend. ','').replace('Cajas Vend ',''))
                         if num not in EXCLUIR and num in SUCURSALES:
@@ -172,6 +176,14 @@ def load_productos():
                     ean = ean_csv
                 else:
                     ean = eans.get(sku, '')
+
+                # Troquel del presupuesto (para export Quantio / distribución CD)
+                if troquel_idx is not None and troquel_idx < len(row):
+                    troquel_pres = row[troquel_idx].strip()
+                elif len(row) > 1:
+                    troquel_pres = row[1].strip()
+                else:
+                    troquel_pres = ''
 
                 # Stock CD: preferir columna del presupuesto, fallback al archivo Stock CD.csv
                 if cd_col_idx is not None and cd_col_idx < len(row):
@@ -228,6 +240,7 @@ def load_productos():
                     'mejor_precio': mejor_precio,
                     'drog_ext':     drog_ext,     # best external droguería (SUD/SUIZO)
                     'troquel':      troqueles.get(ean, '0000000'),
+                    'troquel_pres': troquel_pres, # Troquel del presupuesto (export Quantio)
                     'necesidad':    suc_data,
                     'stock_real':   suc_stock_real,
                     'ventas':       suc_ventas,

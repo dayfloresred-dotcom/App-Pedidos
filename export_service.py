@@ -27,14 +27,15 @@ def generar_sud(items):
 
 def generar_quantio(items):
     """
-    QUANTIO .csv format (pedido a CD / Droguería Red):
-    EAN;Descripción;Cantidad  (separador ';', terminador CRLF)
+    QUANTIO distribución (CD) - formato de ancho fijo:
+    EAN (13) + Troquel (7) + cantidad alineada a la derecha.
+    Largo total de línea: 54 caracteres. Terminador CRLF.
     """
     lines = []
     for it in items:
-        ean = (it.get('ean') or '').strip()
-        # El ';' es el delimitador: limpiarlo de la descripción
-        nombre = (it.get('descripcion') or '').replace(';', ' ').strip()
-        qty = str(it['cantidad'])
-        lines.append(f"{ean};{nombre};{qty}")
+        ean     = (it.get('ean') or '').strip().ljust(13)[:13]
+        troquel = ''.join(ch for ch in str(it.get('troquel') or '') if ch.isdigit()).zfill(7)[:7]
+        qty     = str(it['cantidad'])
+        # EAN(13) + Troquel(7) + cantidad a la derecha rellenando hasta 54
+        lines.append(f"{ean}{troquel}{qty:>34}")
     return '\r\n'.join(lines)
