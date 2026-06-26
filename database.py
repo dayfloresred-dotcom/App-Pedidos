@@ -40,6 +40,14 @@ def init_db():
             drogueria     TEXT
         )
     ''')
+    # Migración: columnas para seguimiento de orden generada por ítem
+    cols = {r['name'] for r in conn.execute("PRAGMA table_info(items_solicitud)").fetchall()}
+    if 'ordenado' not in cols:
+        conn.execute("ALTER TABLE items_solicitud ADD COLUMN ordenado INTEGER NOT NULL DEFAULT 0")
+    if 'drogueria_final' not in cols:
+        conn.execute("ALTER TABLE items_solicitud ADD COLUMN drogueria_final TEXT")
+    if 'fecha_orden' not in cols:
+        conn.execute("ALTER TABLE items_solicitud ADD COLUMN fecha_orden TEXT")
     conn.commit()
     conn.close()
 
@@ -132,6 +140,47 @@ def get_detalle_por_sucursal(sku):
     ''', (sku,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def get_items_detalle(sku):
+    """Detalle por sucursal de un producto pendiente, con estado de orden.
+    ordenado=1 solo si TODOS los ítems de esa sucursal+sku están generados."""
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT s.sucursal,
+               SUM(i.cantidad)        as cantidad,
+               MIN(i.ordenado)        as ordenado,
+               MAX(i.drogueria_final) as drogueria_final
+        FROM items_solicitud i
+        JOIN solicitudes s ON s.id = i.solicitud_id
+        WHERE i.sku=? AND s.estado='pendiente'
+        GROUP BY s.sucursal
+        ORDER BY s.sucursal
+    ''', (sku,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def marcar_item_generado(sku, sucursal, drogueria, fecha):
+    """Marca como generado el pedido de un producto para una sucursal puntual."""
+    conn = get_db()
+    conn.execute('''
+        UPDATE items_solicitud SET ordenado=1, drogueria_final=?, fecha_orden=?
+        WHERE sku=? AND solicitud_id IN (
+            SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'
+        )
+    ''', (drogueria, fecha, sku, sucursal))
+    conn.commit()
+    conn.close()
+
+def desmarcar_item_generado(sku, sucursal):
+    conn = get_db()
+    conn.execute('''
+        UPDATE items_solicitud SET ordenado=0, drogueria_final=NULL, fecha_orden=NULL
+        WHERE sku=? AND solicitud_id IN (
+            SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'
+        )
+    ''', (sku, sucursal))
+    conn.commit()
+    conn.close()
 
 def marcar_comprado(sol_ids, fecha_compra):
     conn = get_db()

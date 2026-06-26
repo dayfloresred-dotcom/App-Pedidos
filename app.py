@@ -4,7 +4,8 @@ from datetime import date, datetime
 from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER
 from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas_solicitudes,
                        get_consolidado, get_detalle_por_sucursal, marcar_comprado, cancelar_solicitud,
-                       get_db, actualizar_droguerias_pendientes)
+                       get_db, actualizar_droguerias_pendientes,
+                       get_items_detalle, marcar_item_generado, desmarcar_item_generado)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -127,19 +128,20 @@ def generar_orden():
         raw_cd   = base.get('stock_cd', 0)
         stock_cd = raw_cd if isinstance(raw_cd, int) else (1 if raw_cd == 'SI' else 0)
         drog_ext = base.get('drog_ext', '')
-        item     = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext, 'es_overflow': False}
+        # Detalle por sucursal con estado de orden (para marcar generado y export Quantio)
+        detalle = get_items_detalle(p['sku'])
+        item     = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext,
+                    'es_overflow': False, 'detalle_suc': detalle}
         drog     = (p.get('drogueria') or '').upper()
+        # Código de droguería que se registra al marcar generado (lo que ve la sucursal)
+        DROG_CODE = {'DROGUERIA RED': 'CD', 'SUD': 'SUD', 'SUIZO': 'SUIZO'}
+        item['drog_code'] = DROG_CODE.get(drog, '')
         if drog == 'DROGUERIA RED':
-            # Detalle por sucursal (agregado) para edición y export Quantio
-            det = {}
-            for r in get_detalle_por_sucursal(p['sku']):
-                det[r['sucursal']] = det.get(r['sucursal'], 0) + r['cantidad']
-            item['detalle_suc'] = [{'sucursal': s, 'cantidad': c} for s, c in sorted(det.items())]
             orden['DROGUERIA RED'].append(item)
             # If CD stock insufficient, add overflow order to external droguería
             overflow = p['total'] - stock_cd
             if overflow > 0 and drog_ext in ('SUD', 'SUIZO'):
-                overflow_item = {**item, 'total': overflow, 'es_overflow': True}
+                overflow_item = {**item, 'total': overflow, 'es_overflow': True, 'detalle_suc': [], 'drog_code': ''}
                 orden[drog_ext].append(overflow_item)
         elif drog == 'SUD':
             orden['SUD'].append(item)
@@ -237,6 +239,33 @@ def api_marcar_comprado():
     conn.close()
     marcar_comprado(sol_ids, fecha)
     return jsonify({'ok': True, 'n': len(sol_ids)})
+
+@app.route('/api/orden/generar-item', methods=['POST'])
+@login_required
+@admin_required
+def api_generar_item():
+    """Marca como generado el pedido de un producto para una sucursal puntual."""
+    data = request.get_json(silent=True) or {}
+    sku  = str(data.get('sku') or '').strip()
+    suc  = (data.get('sucursal') or '').strip()
+    drog = (data.get('drogueria') or '').strip().upper()
+    if not (sku and suc and drog):
+        return jsonify({'error': 'Faltan datos'}), 400
+    marcar_item_generado(sku, suc, drog, date.today().strftime('%d/%m/%Y'))
+    return jsonify({'ok': True})
+
+@app.route('/api/orden/desmarcar-item', methods=['POST'])
+@login_required
+@admin_required
+def api_desmarcar_item():
+    """Revierte el marcado de generado de un producto para una sucursal."""
+    data = request.get_json(silent=True) or {}
+    sku  = str(data.get('sku') or '').strip()
+    suc  = (data.get('sucursal') or '').strip()
+    if not (sku and suc):
+        return jsonify({'error': 'Faltan datos'}), 400
+    desmarcar_item_generado(sku, suc)
+    return jsonify({'ok': True})
 
 # ── Export routes ──────────────────────────────────────────────────────────
 @app.route('/exportar/<drogueria>', methods=['GET', 'POST'])

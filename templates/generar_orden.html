@@ -31,7 +31,8 @@
         <span class="fw-bold" style="color:{% if drog == 'SUD' %}#92400e{% elif drog == 'SUIZO' %}#5b21b6{% elif drog == 'DROGUERIA RED' %}#166534{% else %}#555{% endif %}">{{ drog }}</span>
         <span class="small text-muted">{{ items|length }} productos · {{ items|sum(attribute='total') }} u.</span>
       </div>
-      <div class="card-body p-0" style="max-height:450px;overflow-y:auto">
+      <div class="card-body p-0" style="max-height:480px;overflow-y:auto">
+        {% set ncols = 7 if drog == 'DROGUERIA RED' else 5 %}
         <table class="table table-sm mb-0">
           <thead><tr>
             <th>EAN</th><th>Producto</th><th>Sucursales</th>
@@ -40,15 +41,22 @@
           </tr></thead>
           <tbody>
             {% for it in items %}
+            {% set gens = it.detalle_suc|selectattr('ordenado')|list|length %}
+            {% set tot = it.detalle_suc|length %}
             <tr>
               <td class="text-muted small" style="font-size:11px">{{ it.ean[:13] }}</td>
               <td style="font-size:12px">
-                {% if drog == 'DROGUERIA RED' %}
-                <button class="btn btn-sm btn-link p-0 me-1 toggle-det" style="text-decoration:none"
+                {% if not it.es_overflow %}
+                <button class="btn btn-sm btn-link p-0 me-1" style="text-decoration:none"
                   onclick="toggleDet('{{ it.sku }}', this)">▸</button>
                 {% endif %}
                 {{ it.descripcion[:32] }}
                 {% if it.es_overflow %}<span class="ms-1" style="background:#e0f2fe;color:#075985;font-size:10px;padding:1px 6px;border-radius:8px">excedente CD</span>{% endif %}
+                {% if not it.es_overflow and tot > 0 %}
+                <span class="gencount-{{ it.sku }}" style="font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;
+                  background:{% if gens==tot %}#dcfce7{% elif gens>0 %}#fef9c3{% else %}#f1f5f9{% endif %};
+                  color:{% if gens==tot %}#166534{% elif gens>0 %}#854d0e{% else %}#64748b{% endif %}">{{ gens }}/{{ tot }} gen.</span>
+                {% endif %}
               </td>
               <td>{{ it.sucursales_str|safe }}</td>
               {% if drog == 'DROGUERIA RED' %}
@@ -72,19 +80,30 @@
                   onclick="removeItem('{{ drog }}','{{ it.sku }}')">×</button>
               </td>
             </tr>
-            {% if drog == 'DROGUERIA RED' %}
+            {% if not it.es_overflow %}
             <tr class="detalle-{{ it.sku }}" style="display:none">
-              <td colspan="7" style="background:#f6fbf8">
-                <div class="d-flex flex-wrap gap-3 px-2 py-2">
-                  <span class="small text-muted align-self-center">Cantidad por sucursal:</span>
-                  {% for d in it.detalle_suc %}
-                  <label class="small d-flex align-items-center gap-1">
-                    <span class="text-muted">{{ d.sucursal }}</span>
-                    <input type="number" min="0" value="{{ d.cantidad }}" style="width:62px"
-                      class="form-control form-control-sm qty-cd"
-                      data-sku="{{ it.sku }}" data-sucursal="{{ d.sucursal }}">
-                  </label>
-                  {% endfor %}
+              <td colspan="{{ ncols }}" style="background:#f6fbf8">
+                <div class="px-2 py-2">
+                  <div class="small text-muted mb-2">Marcá el pedido generado de cada sucursal{% if drog == 'DROGUERIA RED' %} (la cantidad editable es para el archivo Quantio){% endif %}:</div>
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for d in it.detalle_suc %}
+                    <div class="d-flex align-items-center gap-2 border rounded px-2 py-1" style="background:#fff">
+                      <span class="small fw-bold">{{ d.sucursal }}</span>
+                      {% if drog == 'DROGUERIA RED' %}
+                      <input type="number" min="0" value="{{ d.cantidad }}" style="width:54px"
+                        class="form-control form-control-sm qty-cd"
+                        data-sku="{{ it.sku }}" data-sucursal="{{ d.sucursal }}" title="Cantidad para Quantio">
+                      {% else %}
+                      <span class="badge bg-light text-dark border">{{ d.cantidad }} u.</span>
+                      {% endif %}
+                      <button class="btn btn-sm mark-btn py-0 px-2 {% if d.ordenado %}btn-success{% else %}btn-outline-success{% endif %}"
+                        data-on="{% if d.ordenado %}1{% else %}0{% endif %}"
+                        onclick="marcarItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}', this)">
+                        {% if d.ordenado %}✓ Generado{% else %}Generar{% endif %}
+                      </button>
+                    </div>
+                    {% endfor %}
+                  </div>
                 </div>
               </td>
             </tr>
@@ -172,6 +191,45 @@ function exportQuantio() {
   });
   if (!items.length) { alert('Esa sucursal no tiene productos con stock en CD'); return; }
   descargar('/exportar-quantio', {sucursal: suc, items}, 'quantio.csv');
+}
+
+async function marcarItem(sku, suc, drog, btn) {
+  const generado = btn.dataset.on === '1';
+  const url = generado ? '/api/orden/desmarcar-item' : '/api/orden/generar-item';
+  btn.disabled = true;
+  const res = await fetch(url, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sku, sucursal: suc, drogueria: drog})
+  });
+  let d = {};
+  try { d = await res.json(); } catch (_) {}
+  btn.disabled = false;
+  if (res.ok && d.ok) {
+    if (generado) {
+      btn.dataset.on = '0'; btn.textContent = 'Generar';
+      btn.className = 'btn btn-sm mark-btn py-0 px-2 btn-outline-success';
+    } else {
+      btn.dataset.on = '1'; btn.textContent = '✓ Generado';
+      btn.className = 'btn btn-sm mark-btn py-0 px-2 btn-success';
+    }
+    updateGenCount(sku);
+  } else {
+    alert(d.error || 'No se pudo actualizar.');
+  }
+}
+
+function updateGenCount(sku) {
+  const row = document.querySelector('.detalle-' + CSS.escape(sku));
+  if (!row) return;
+  const btns = row.querySelectorAll('button.mark-btn');
+  let on = 0; btns.forEach(b => { if (b.dataset.on === '1') on++; });
+  const badge = document.querySelector('.gencount-' + CSS.escape(sku));
+  if (badge) {
+    badge.textContent = on + '/' + btns.length + ' gen.';
+    const all = on === btns.length;
+    badge.style.background = all ? '#dcfce7' : (on > 0 ? '#fef9c3' : '#f1f5f9');
+    badge.style.color      = all ? '#166534' : (on > 0 ? '#854d0e' : '#64748b');
+  }
 }
 
 async function marcarComprado(drog) {
