@@ -437,14 +437,17 @@ def exportar_quantio():
 @admin_required
 def actualizar_datos():
     from config import (PRESUPUESTO_CSV, STOCK_CD_CSV, LISTADO_STOCK_CSV,
-                        PRECIOS_SUD_TXT, PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS)
+                        PRECIOS_SUD_TXT, PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS,
+                        PRECIOS_DDS_XLSX, PRECIOS_SUIZO_CMP_XLSX)
     import data_loader
 
     ARCHIVOS = {
-        'presupuesto':         {'label': 'Presupuesto (ventas, stock y stock CD)', 'path': PRESUPUESTO_CSV,    'accept': '.csv,.txt', 'diario': True},
-        'precios_sud':         {'label': 'Precios SUD',                            'path': PRECIOS_SUD_TXT,    'accept': '.txt',      'diario': False},
-        'precios_suizo_perfu': {'label': 'Precios Suizo Perfumería',               'path': PRECIOS_SUIZO_PERFU,'accept': '.xls,.xlsx','diario': False},
-        'precios_suizo_ins':   {'label': 'Precios Suizo Insumos',                  'path': PRECIOS_SUIZO_INS,  'accept': '.xls,.xlsx','diario': False},
+        'presupuesto':         {'label': 'Presupuesto (ventas, stock y stock CD)',  'path': PRESUPUESTO_CSV,       'accept': '.csv,.txt', 'diario': True},
+        'precios_dds':         {'label': 'Lista DDS / Sud (comparador, precio final)', 'path': PRECIOS_DDS_XLSX,    'accept': '.xlsx',     'diario': False},
+        'precios_suizo_cmp':   {'label': 'Lista Suizo (comparador, precio final)',   'path': PRECIOS_SUIZO_CMP_XLSX,'accept': '.xlsx',     'diario': False},
+        'precios_sud':         {'label': 'Precios SUD (formato viejo .txt)',         'path': PRECIOS_SUD_TXT,       'accept': '.txt',      'diario': False},
+        'precios_suizo_perfu': {'label': 'Precios Suizo Perfumería (viejo)',         'path': PRECIOS_SUIZO_PERFU,   'accept': '.xls,.xlsx','diario': False},
+        'precios_suizo_ins':   {'label': 'Precios Suizo Insumos (viejo)',            'path': PRECIOS_SUIZO_INS,     'accept': '.xls,.xlsx','diario': False},
     }
 
     if request.method == 'POST':

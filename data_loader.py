@@ -1,14 +1,16 @@
 import csv, re, os, pickle
 from config import (PRESUPUESTO_CSV, LISTADO_STOCK_CSV, STOCK_CD_CSV,
                     PRECIOS_SUD_TXT, PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS,
+                    PRECIOS_DDS_XLSX, PRECIOS_SUIZO_CMP_XLSX,
                     SUCURSALES, BASE_DIR)
 
 RUBROS   = {'Perfumería', 'Accesorios'}
 EXCLUIR  = {'17', '33'}
 # v2: agrega troquel_pres (Troquel del presupuesto) — el cambio de nombre fuerza regenerar el cache
-CACHE_FILE = os.path.join(BASE_DIR, 'productos_cache_v2.pkl')
+CACHE_FILE = os.path.join(BASE_DIR, 'productos_cache_v3.pkl')
 SOURCE_FILES = [PRESUPUESTO_CSV, LISTADO_STOCK_CSV, STOCK_CD_CSV,
-                PRECIOS_SUD_TXT, PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS]
+                PRECIOS_SUD_TXT, PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS,
+                PRECIOS_DDS_XLSX, PRECIOS_SUIZO_CMP_XLSX]
 
 _productos = None   # list of dicts, loaded once at startup
 
@@ -89,6 +91,93 @@ def _load_suizo_prices():
                             prices[ean] = p
     return prices
 
+def _load_dds_prices():
+    """Reporte DDS (Sud) del comparador -> {EAN: precio final con IVA}.
+    Precio base = 'P. c/dtos + 12% (NM)'. Medicamentos (ME) sin IVA; resto +21%."""
+    if not os.path.exists(PRECIOS_DDS_XLSX):
+        return {}
+    prices = {}
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(PRECIOS_DDS_XLSX, read_only=True, data_only=True)
+        ws = wb.active
+        idx = None
+        for row in ws.iter_rows(values_only=True):
+            cells = [('' if c is None else str(c).strip()) for c in row]
+            if idx is None:
+                if 'EAN' in cells:
+                    idx = {}
+                    for i, c in enumerate(cells):
+                        cl = c.lower()
+                        if c == 'EAN': idx['ean'] = i
+                        elif 'c/dtos + 12%' in cl: idx['neto'] = i
+                        elif 'categor' in cl: idx['cat'] = i
+                continue
+            if 'ean' not in idx or 'neto' not in idx:
+                break
+            try:
+                ean = str(int(float(cells[idx['ean']])))
+            except (ValueError, TypeError):
+                continue
+            try:
+                neto = float(row[idx['neto']])
+            except (ValueError, TypeError):
+                continue
+            cat = cells[idx['cat']].upper() if 'cat' in idx else ''
+            final = neto if cat == 'ME' else neto * 1.21
+            if final > 0:
+                prices[ean] = round(final, 2)
+        wb.close()
+    except Exception as e:
+        print('[DATA] Error leyendo reporte DDS comparador:', e)
+        return {}
+    return prices
+
+def _load_suizo_cmp_prices():
+    """Reporte Suizo del comparador -> {EAN: precio final con IVA}.
+    Base = 'Su Precio'; x0.88 si 'Aplica 12%'=Si; x1.21 si 'Aplica IVA'=Si."""
+    if not os.path.exists(PRECIOS_SUIZO_CMP_XLSX):
+        return {}
+    prices = {}
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(PRECIOS_SUIZO_CMP_XLSX, read_only=True, data_only=True)
+        ws = wb.active
+        idx = None
+        for row in ws.iter_rows(values_only=True):
+            cells = [('' if c is None else str(c).strip()) for c in row]
+            if idx is None:
+                if 'EAN' in cells:
+                    idx = {}
+                    for i, c in enumerate(cells):
+                        cl = c.lower()
+                        if c == 'EAN': idx['ean'] = i
+                        elif cl == 'su precio': idx['precio'] = i
+                        elif 'aplica 12' in cl: idx['a12'] = i
+                        elif 'aplica iva' in cl: idx['aiva'] = i
+                continue
+            if 'ean' not in idx or 'precio' not in idx:
+                break
+            try:
+                ean = str(int(float(cells[idx['ean']])))
+            except (ValueError, TypeError):
+                continue
+            try:
+                base = float(row[idx['precio']])
+            except (ValueError, TypeError):
+                continue
+            if 'a12' in idx and cells[idx['a12']].lower() == 'si':
+                base *= 0.88
+            if 'aiva' in idx and cells[idx['aiva']].lower() == 'si':
+                base *= 1.21
+            if base > 0:
+                prices[ean] = round(base, 2)
+        wb.close()
+    except Exception as e:
+        print('[DATA] Error leyendo reporte Suizo comparador:', e)
+        return {}
+    return prices
+
 def _load_troqueles_sud():
     """Map EAN -> troquel (7 chars) from SUD price file for .dds export."""
     if not os.path.exists(PRECIOS_SUD_TXT):
@@ -134,8 +223,12 @@ def load_productos():
 
     eans      = _load_eans()
     cd_stock  = _load_cd_stock()
-    sud_p     = _load_sud_prices()
-    suizo_p   = _load_suizo_prices()
+    sud_cmp   = _load_dds_prices()
+    suizo_cmp = _load_suizo_cmp_prices()
+    sud_p     = sud_cmp if sud_cmp else _load_sud_prices()
+    suizo_p   = suizo_cmp if suizo_cmp else _load_suizo_prices()
+    if sud_cmp:   print(f'[DATA] Precios SUD desde comparador: {len(sud_cmp)}')
+    if suizo_cmp: print(f'[DATA] Precios SUIZO desde comparador: {len(suizo_cmp)}')
     troqueles = _load_troqueles_sud()
 
     headers     = []

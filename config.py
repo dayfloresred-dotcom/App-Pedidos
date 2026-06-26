@@ -23,6 +23,8 @@ if os.path.isdir(_NEC_DIR):
     PRECIOS_SUD_TXT   = os.path.join(DATA_DIR, 'precios Sud.txt')
     PRECIOS_SUIZO_PERFU = os.path.join(DATA_DIR, 'precios perfu Suizo.xls')
     PRECIOS_SUIZO_INS   = os.path.join(DATA_DIR, 'precios insumos Suizo.xls')
+    PRECIOS_DDS_XLSX       = os.path.join(DATA_DIR, 'precios DDS.xlsx')
+    PRECIOS_SUIZO_CMP_XLSX = os.path.join(DATA_DIR, 'precios Suizo cmp.xlsx')
 else:
     DATA_DIR          = os.path.join(BASE_DIR, 'data')
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -32,6 +34,8 @@ else:
     PRECIOS_SUD_TXT   = os.path.join(DATA_DIR, 'precios_sud.txt')
     PRECIOS_SUIZO_PERFU = os.path.join(DATA_DIR, 'precios_suizo_perfu.xls')
     PRECIOS_SUIZO_INS   = os.path.join(DATA_DIR, 'precios_suizo_ins.xls')
+    PRECIOS_DDS_XLSX       = os.path.join(DATA_DIR, 'precios_dds.xlsx')
+    PRECIOS_SUIZO_CMP_XLSX = os.path.join(DATA_DIR, 'precios_suizo_cmp.xlsx')
 
 # Sucursales: number -> name
 SUCURSALES = {
