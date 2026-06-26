@@ -5,7 +5,8 @@ from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER
 from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas_solicitudes,
                        get_consolidado, get_detalle_por_sucursal, marcar_comprado, cancelar_solicitud,
                        get_db, actualizar_droguerias_pendientes,
-                       get_items_detalle, marcar_item_generado, desmarcar_item_generado)
+                       get_items_detalle, marcar_item_generado, desmarcar_item_generado,
+                       cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -265,6 +266,47 @@ def api_desmarcar_item():
     if not (sku and suc):
         return jsonify({'error': 'Faltan datos'}), 400
     desmarcar_item_generado(sku, suc)
+    return jsonify({'ok': True})
+
+@app.route('/api/orden/cancelar-producto', methods=['POST'])
+@login_required
+@admin_required
+def api_cancelar_producto():
+    """Cancela un producto para todas las sucursales pendientes (vista compras)."""
+    sku = str((request.get_json(silent=True) or {}).get('sku') or '').strip()
+    if not sku:
+        return jsonify({'error': 'Falta sku'}), 400
+    cancelar_producto(sku)
+    return jsonify({'ok': True})
+
+@app.route('/api/orden/cancelar-item', methods=['POST'])
+@login_required
+@admin_required
+def api_cancelar_item_suc():
+    """Cancela un producto para una sucursal puntual (vista compras)."""
+    data = request.get_json(silent=True) or {}
+    sku  = str(data.get('sku') or '').strip()
+    suc  = (data.get('sucursal') or '').strip()
+    if not (sku and suc):
+        return jsonify({'error': 'Faltan datos'}), 400
+    cancelar_producto_sucursal(sku, suc)
+    return jsonify({'ok': True})
+
+@app.route('/api/item/cancelar', methods=['POST'])
+@login_required
+def api_cancelar_item_id():
+    """Cancela un ítem puntual de un pedido (vista sucursal). Permiso: admin o dueño."""
+    data = request.get_json(silent=True) or {}
+    try:
+        item_id = int(data.get('item_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Falta el ítem'}), 400
+    suc = get_item_sucursal(item_id)
+    if suc is None:
+        return jsonify({'error': 'Ítem no encontrado'}), 404
+    if session.get('rol') != 'admin' and session.get('username') != suc:
+        return jsonify({'error': 'Sin permiso'}), 403
+    cancelar_item(item_id)
     return jsonify({'ok': True})
 
 # ── Export routes ──────────────────────────────────────────────────────────

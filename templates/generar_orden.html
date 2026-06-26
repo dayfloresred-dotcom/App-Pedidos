@@ -75,16 +75,20 @@
                   data-sku="{{ it.sku }}" data-drog="{{ drog }}">
               </td>
               <td>
-                <button class="btn btn-sm btn-link text-danger p-0"
-                  data-sku="{{ it.sku }}" data-drog="{{ drog }}"
-                  onclick="removeItem('{{ drog }}','{{ it.sku }}')">×</button>
+                {% if it.es_overflow %}
+                <button class="btn btn-sm btn-link text-secondary p-0" title="Ocultar"
+                  onclick="this.closest('tr').remove()">×</button>
+                {% else %}
+                <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar producto (todas las sucursales)"
+                  onclick="cancelarProducto('{{ it.sku }}')">×</button>
+                {% endif %}
               </td>
             </tr>
             {% if not it.es_overflow %}
             <tr class="detalle-{{ it.sku }}" style="display:none">
               <td colspan="{{ ncols }}" style="background:#f6fbf8">
                 <div class="px-2 py-2">
-                  <div class="small text-muted mb-2">Marcá el pedido generado de cada sucursal{% if drog == 'DROGUERIA RED' %} (la cantidad editable es para el archivo Quantio){% endif %}:</div>
+                  <div class="small text-muted mb-2">Marcá el pedido generado de cada sucursal{% if drog == 'DROGUERIA RED' %} (la cantidad editable es para el archivo Quantio){% endif %}. La ✕ cancela ese producto solo para esa sucursal:</div>
                   <div class="d-flex flex-wrap gap-2">
                     {% for d in it.detalle_suc %}
                     <div class="d-flex align-items-center gap-2 border rounded px-2 py-1" style="background:#fff">
@@ -101,6 +105,8 @@
                         onclick="marcarItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}', this)">
                         {% if d.ordenado %}✓ Generado{% else %}Generar{% endif %}
                       </button>
+                      <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar para esta sucursal"
+                        onclick="cancelarSucursal('{{ it.sku }}','{{ d.sucursal }}')">✕</button>
                     </div>
                     {% endfor %}
                   </div>
@@ -126,16 +132,6 @@
 {% endblock %}
 {% block scripts %}
 <script>
-function removeItem(drog, sku) {
-  const btn = document.querySelector(`button.btn-link[data-sku="${sku}"][data-drog="${drog}"]`);
-  if (btn) {
-    const row = btn.closest('tr');
-    const det = document.querySelector(`.detalle-${CSS.escape(sku)}`);
-    if (det) det.remove();
-    row.remove();
-  }
-}
-
 function toggleDet(sku, btn) {
   const row = document.querySelector('.detalle-' + CSS.escape(sku));
   if (!row) return;
@@ -230,6 +226,26 @@ function updateGenCount(sku) {
     badge.style.background = all ? '#dcfce7' : (on > 0 ? '#fef9c3' : '#f1f5f9');
     badge.style.color      = all ? '#166534' : (on > 0 ? '#854d0e' : '#64748b');
   }
+}
+
+async function cancelarProducto(sku) {
+  if (!confirm('¿Cancelar este producto para TODAS las sucursales que lo pidieron?\nSe marcará como cancelado en sus pedidos.')) return;
+  const res = await fetch('/api/orden/cancelar-producto', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sku})
+  });
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo cancelar.');
+}
+
+async function cancelarSucursal(sku, suc) {
+  if (!confirm('¿Cancelar este producto solo para ' + suc + '?')) return;
+  const res = await fetch('/api/orden/cancelar-item', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sku, sucursal: suc})
+  });
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo cancelar.');
 }
 
 async function marcarComprado(drog) {

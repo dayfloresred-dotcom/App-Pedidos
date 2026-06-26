@@ -40,7 +40,7 @@ def init_db():
             drogueria     TEXT
         )
     ''')
-    # Migración: columnas para seguimiento de orden generada por ítem
+    # Migración: columnas para seguimiento de orden generada / cancelación por ítem
     cols = {r['name'] for r in conn.execute("PRAGMA table_info(items_solicitud)").fetchall()}
     if 'ordenado' not in cols:
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN ordenado INTEGER NOT NULL DEFAULT 0")
@@ -48,6 +48,8 @@ def init_db():
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN drogueria_final TEXT")
     if 'fecha_orden' not in cols:
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN fecha_orden TEXT")
+    if 'cancelado' not in cols:
+        conn.execute("ALTER TABLE items_solicitud ADD COLUMN cancelado INTEGER NOT NULL DEFAULT 0")
     conn.commit()
     conn.close()
 
@@ -95,7 +97,7 @@ def get_solicitud_detalle(sol_id):
 
 def get_todas_solicitudes(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None):
     conn = get_db()
-    query = 'SELECT s.*, COUNT(i.id) as n_items FROM solicitudes s LEFT JOIN items_solicitud i ON i.solicitud_id=s.id'
+    query = 'SELECT s.*, COUNT(i.id) as n_items FROM solicitudes s LEFT JOIN items_solicitud i ON i.solicitud_id=s.id AND i.cancelado=0'
     params = []
     wheres = []
     if sucursal_filtro:
@@ -115,7 +117,7 @@ def get_consolidado(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None
                GROUP_CONCAT(DISTINCT s.sucursal) as sucursales
         FROM items_solicitud i
         JOIN solicitudes s ON s.id=i.solicitud_id
-        WHERE s.estado='pendiente'
+        WHERE s.estado='pendiente' AND i.cancelado=0
     '''
     params = []
     if sucursal_filtro:
@@ -135,7 +137,7 @@ def get_detalle_por_sucursal(sku):
         SELECT s.sucursal, i.cantidad
         FROM items_solicitud i
         JOIN solicitudes s ON s.id=i.solicitud_id
-        WHERE i.sku=? AND s.estado='pendiente'
+        WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0
         ORDER BY s.sucursal
     ''', (sku,)).fetchall()
     conn.close()
@@ -152,7 +154,7 @@ def get_items_detalle(sku):
                MAX(i.drogueria_final) as drogueria_final
         FROM items_solicitud i
         JOIN solicitudes s ON s.id = i.solicitud_id
-        WHERE i.sku=? AND s.estado='pendiente'
+        WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0
         GROUP BY s.sucursal
         ORDER BY s.sucursal
     ''', (sku,)).fetchall()
@@ -164,7 +166,7 @@ def marcar_item_generado(sku, sucursal, drogueria, fecha):
     conn = get_db()
     conn.execute('''
         UPDATE items_solicitud SET ordenado=1, drogueria_final=?, fecha_orden=?
-        WHERE sku=? AND solicitud_id IN (
+        WHERE sku=? AND cancelado=0 AND solicitud_id IN (
             SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'
         )
     ''', (drogueria, fecha, sku, sucursal))
@@ -181,6 +183,69 @@ def desmarcar_item_generado(sku, sucursal):
     ''', (sku, sucursal))
     conn.commit()
     conn.close()
+
+def _recalc_estado_solicitud(conn, sol_id):
+    """Si todos los ítems de la solicitud quedaron cancelados, marca la solicitud como cancelada."""
+    row = conn.execute(
+        "SELECT COUNT(*) AS c, COALESCE(SUM(cancelado),0) AS cc FROM items_solicitud WHERE solicitud_id=?",
+        (sol_id,)
+    ).fetchone()
+    if row['c'] and row['c'] == row['cc']:
+        conn.execute("UPDATE solicitudes SET estado='cancelado' WHERE id=? AND estado='pendiente'", (sol_id,))
+
+def cancelar_producto(sku):
+    """Cancela un producto para TODAS las sucursales con pedido pendiente."""
+    conn = get_db()
+    sols = [r['id'] for r in conn.execute('''
+        SELECT DISTINCT s.id FROM solicitudes s JOIN items_solicitud i ON i.solicitud_id=s.id
+        WHERE i.sku=? AND s.estado='pendiente'
+    ''', (sku,)).fetchall()]
+    conn.execute('''
+        UPDATE items_solicitud SET cancelado=1
+        WHERE sku=? AND solicitud_id IN (SELECT id FROM solicitudes WHERE estado='pendiente')
+    ''', (sku,))
+    for sid in sols:
+        _recalc_estado_solicitud(conn, sid)
+    conn.commit()
+    conn.close()
+
+def cancelar_producto_sucursal(sku, sucursal):
+    """Cancela un producto para una sucursal puntual."""
+    conn = get_db()
+    sols = [r['id'] for r in conn.execute(
+        "SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'", (sucursal,)
+    ).fetchall()]
+    conn.execute('''
+        UPDATE items_solicitud SET cancelado=1
+        WHERE sku=? AND solicitud_id IN (
+            SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'
+        )
+    ''', (sku, sucursal))
+    for sid in sols:
+        _recalc_estado_solicitud(conn, sid)
+    conn.commit()
+    conn.close()
+
+def cancelar_item(item_id):
+    """Cancela un ítem puntual (un producto dentro de un pedido). Devuelve solicitud_id o None."""
+    conn = get_db()
+    row = conn.execute("SELECT solicitud_id FROM items_solicitud WHERE id=?", (item_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    conn.execute("UPDATE items_solicitud SET cancelado=1 WHERE id=?", (item_id,))
+    _recalc_estado_solicitud(conn, row['solicitud_id'])
+    conn.commit()
+    conn.close()
+    return row['solicitud_id']
+
+def get_item_sucursal(item_id):
+    conn = get_db()
+    row = conn.execute('''
+        SELECT s.sucursal FROM items_solicitud i JOIN solicitudes s ON s.id=i.solicitud_id WHERE i.id=?
+    ''', (item_id,)).fetchone()
+    conn.close()
+    return row['sucursal'] if row else None
 
 def marcar_comprado(sol_ids, fecha_compra):
     conn = get_db()
