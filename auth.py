@@ -7,6 +7,18 @@ from config import SUCURSAL_NAMES, ADMIN_USER
 def seed_users():
     """Create default users if they don't exist."""
     conn = get_db()
+    # Migración: renombrar ARMA -> ARMADA (una sola vez)
+    has_arma   = conn.execute("SELECT 1 FROM usuarios WHERE username='ARMA'").fetchone()
+    has_armada = conn.execute("SELECT 1 FROM usuarios WHERE username='ARMADA'").fetchone()
+    if has_arma and not has_armada:
+        conn.execute("UPDATE usuarios SET username='ARMADA', password_hash=? WHERE username='ARMA'",
+                     (generate_password_hash('armada123'),))
+        conn.execute("UPDATE solicitudes SET sucursal='ARMADA' WHERE sucursal='ARMA'")
+        try:
+            conn.execute("UPDATE envios SET sucursal='ARMADA' WHERE sucursal='ARMA'")
+        except Exception:
+            pass
+        conn.commit()
     existing = {r['username'] for r in conn.execute('SELECT username FROM usuarios').fetchall()}
     to_create = []
     if ADMIN_USER not in existing:
