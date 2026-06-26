@@ -6,7 +6,8 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        get_consolidado, get_detalle_por_sucursal, marcar_comprado, cancelar_solicitud,
                        get_db, actualizar_droguerias_pendientes,
                        get_items_detalle, marcar_item_generado, desmarcar_item_generado,
-                       cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal)
+                       cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal,
+                       marcar_comprado_drogueria, marcar_inexistente)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -230,16 +231,26 @@ def api_orden_remove():
 @login_required
 @admin_required
 def api_marcar_comprado():
-    data  = request.get_json()
-    drog  = data.get('drogueria')
-    fecha = data.get('fecha', date.today().strftime('%d/%m/%Y'))
-    conn  = get_db()
-    sol_ids = [r['solicitud_id'] for r in conn.execute(
-        'SELECT DISTINCT solicitud_id FROM items_solicitud WHERE drogueria=?', (drog,)
-    ).fetchall()]
-    conn.close()
-    marcar_comprado(sol_ids, fecha)
-    return jsonify({'ok': True, 'n': len(sol_ids)})
+    """Marca como comprados SOLO los productos de esa droguería (a nivel item)."""
+    data  = request.get_json(silent=True) or {}
+    drog  = (data.get('drogueria') or '').strip()
+    fecha = data.get('fecha') or date.today().strftime('%d/%m/%Y')
+    if not drog:
+        return jsonify({'error': 'Falta droguería'}), 400
+    n = marcar_comprado_drogueria(drog, fecha)
+    return jsonify({'ok': True, 'n': n})
+
+@app.route('/api/orden/inexistente', methods=['POST'])
+@login_required
+@admin_required
+def api_inexistente():
+    """Marca productos sin precio como inexistentes (cancelados con origen 'Producto inexistente')."""
+    skus = (request.get_json(silent=True) or {}).get('skus') or []
+    for sku in skus:
+        sku = str(sku).strip()
+        if sku:
+            marcar_inexistente(sku)
+    return jsonify({'ok': True, 'n': len(skus)})
 
 @app.route('/api/orden/generar-item', methods=['POST'])
 @login_required

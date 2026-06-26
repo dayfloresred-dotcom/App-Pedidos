@@ -119,11 +119,18 @@
         </table>
       </div>
       <div class="card-footer">
+        {% if drog == 'SIN_PRECIO' %}
+        <button class="btn btn-sm w-100 text-white" style="background:#991b1b"
+          onclick="marcarInexistente()">
+          ✕ Marcar como producto inexistente
+        </button>
+        {% else %}
         <button class="btn btn-sm w-100 text-white"
           style="background:{% if drog == 'SUD' %}#92400e{% elif drog == 'SUIZO' %}#5b21b6{% elif drog == 'DROGUERIA RED' %}#166534{% else %}#555{% endif %}"
           onclick="marcarComprado('{{ drog }}')">
           ✓ Marcar {{ drog }} como comprado
         </button>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -257,9 +264,22 @@ async function marcarComprado(drog) {
   });
   const d = await res.json();
   if (d.ok) {
-    alert(`✓ ${drog} marcado como comprado. ${d.n} solicitud(es) actualizadas.`);
+    alert(`✓ ${drog}: ${d.n} producto(s) marcados como comprados y quitados de la orden.`);
     location.reload();
   }
+}
+
+async function marcarInexistente() {
+  const skus = [];
+  document.querySelectorAll('.qty-input[data-drog="SIN_PRECIO"]').forEach(inp => skus.push(inp.dataset.sku));
+  if (!skus.length) { alert('No hay productos sin precio'); return; }
+  if (!confirm('¿Marcar estos productos como INEXISTENTES?\nAparecerán como Cancelado / "Producto inexistente" en los pedidos.')) return;
+  const res = await fetch('/api/orden/inexistente', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({skus})
+  });
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo.');
 }
 </script>
 {% endblock %}
