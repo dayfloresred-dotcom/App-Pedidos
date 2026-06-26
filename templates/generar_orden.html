@@ -4,19 +4,18 @@
   <h5 class="mb-0">Generar orden de compra</h5>
   <span class="text-muted small">Fecha: {{ hoy }}</span>
   <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
-    {% if sucs_cd %}
-    <div class="d-flex gap-1 align-items-center">
-      <select id="quantio-suc" class="form-select form-select-sm" style="width:auto">
-        {% for s in sucs_cd %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
-      </select>
-      <button class="btn btn-sm text-white" style="background:#166534"
-        onclick="exportQuantio()">↓ Quantio (CD)</button>
-    </div>
-    {% endif %}
+    {% if sucs_orden %}
+    <span class="small text-muted">Exportar pedido de:</span>
+    <select id="export-suc" class="form-select form-select-sm" style="width:auto">
+      {% for s in sucs_orden %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-sm text-white" style="background:#166534"
+      onclick="exportPedido('CD')">↓ Quantio (CD)</button>
     <button class="btn btn-sm text-white" style="background:#92400e"
-      onclick="exportDrog('SUD')">↓ Exportar SUD (.dds)</button>
+      onclick="exportPedido('SUD')">↓ SUD (.dds)</button>
     <button class="btn btn-sm text-white" style="background:#5b21b6"
-      onclick="exportDrog('SUIZO')">↓ Exportar SUIZO (.arg)</button>
+      onclick="exportPedido('SUIZO')">↓ SUIZO (.arg)</button>
+    {% endif %}
   </div>
 </div>
 {% if not orden %}
@@ -170,28 +169,19 @@ async function descargar(url, payload, fallbackName) {
   URL.revokeObjectURL(a.href);
 }
 
-function exportDrog(drog) {
-  const items = [];
-  document.querySelectorAll(`.qty-input[data-drog="${drog}"]`).forEach(inp => {
-    const cant = parseInt(inp.value, 10);
-    if (cant > 0) items.push({sku: inp.dataset.sku, cantidad: cant});
-  });
-  if (!items.length) { alert('No hay productos para ' + drog); return; }
-  descargar('/exportar/' + drog, {items}, 'pedido_' + drog.toLowerCase());
-}
-
-function exportQuantio() {
-  const sel = document.getElementById('quantio-suc');
+function exportPedido(code) {
+  const sel = document.getElementById('export-suc');
   if (!sel || !sel.value) { alert('Elegí una sucursal'); return; }
   const suc = sel.value;
   const sucAttr = suc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const items = [];
-  document.querySelectorAll(`.qty-cd[data-sucursal="${sucAttr}"]`).forEach(inp => {
+  document.querySelectorAll(`.env-input[data-sucursal="${sucAttr}"][data-code="${code}"]`).forEach(inp => {
     const cant = parseInt(inp.value, 10);
     if (cant > 0) items.push({sku: inp.dataset.sku, cantidad: cant});
   });
-  if (!items.length) { alert('Esa sucursal no tiene productos con stock en CD'); return; }
-  descargar('/exportar-quantio', {sucursal: suc, items}, 'quantio.csv');
+  if (!items.length) { alert('Esa sucursal no tiene cantidades cargadas para ' + code); return; }
+  const url = code === 'CD' ? '/exportar-quantio' : '/exportar/' + code;
+  descargar(url, {sucursal: suc, items}, 'pedido_' + code.toLowerCase());
 }
 
 async function enviarItem(sku, suc, code, rid, btn) {

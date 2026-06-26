@@ -160,12 +160,12 @@ def generar_orden():
         else:
             orden['SIN_PRECIO'].append(item)
 
-    # Sucursales con productos en CD (para el desplegable de export Quantio)
-    sucs_cd = sorted({d['sucursal'] for it in orden['DROGUERIA RED'] for d in it['detalle_suc']})
+    # Sucursales presentes en el pedido (para el desplegable de export por sucursal)
+    sucs_orden = sorted({d['sucursal'] for its in orden.values() for it in its for d in it['detalle_suc']})
 
     return render_template('generar_orden.html',
         orden={k: v for k, v in orden.items() if v},
-        sucs_cd=sucs_cd,
+        sucs_orden=sucs_orden,
         hoy=date.today().strftime('%d/%m/%Y'))
 
 # ── API endpoints ──────────────────────────────────────────────────────────
@@ -354,30 +354,39 @@ def api_cancelar_item_id():
 @login_required
 @admin_required
 def exportar(drogueria):
+    """Exporta el pedido de UNA sucursal para esa droguería, con las cantidades manuales cargadas."""
     drog = drogueria.upper()
+    data = request.get_json(silent=True) or {}
+    sucursal = (data.get('sucursal') or '').strip()
+    if not sucursal:
+        return jsonify({'error': 'Elegí una sucursal'}), 400
+
     prod_map = {p['sku']: p for p in load_productos()}
-
-    # Usa EXACTAMENTE las cantidades cargadas manualmente con "Enviar" (tabla envios)
-    envios = get_envios_por_drogueria(drog)
-    if not envios:
-        return jsonify({'error': f'No hay cantidades cargadas para {drog}. Cargá las cantidades con "Enviar" en cada sucursal.'}), 400
-
     items = []
-    for e in envios:
-        base = prod_map.get(e['sku'], {})
+    for it in data.get('items', []):
+        try:
+            cant = max(0, int(it['cantidad']))
+        except (KeyError, ValueError, TypeError):
+            continue
+        if cant <= 0:
+            continue
+        base = prod_map.get(str(it.get('sku')), {})
         items.append({
-            'ean':         base.get('ean', ''),
+            'ean':         it.get('ean') or base.get('ean', ''),
             'troquel':     base.get('troquel', '0000000'),
             'descripcion': base.get('descripcion', ''),
-            'cantidad':    e['total'],
+            'cantidad':    cant,
         })
+    if not items:
+        return jsonify({'error': f'{sucursal} no tiene cantidades cargadas para {drog}.'}), 400
 
+    suc_slug = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
     if drog == 'SUIZO':
         content  = generar_suizo(items)
-        filename = f'pedido_suizo_{date.today().strftime("%d%m%y")}.arg'
+        filename = f'suizo_{suc_slug}_{date.today().strftime("%d%m%y")}.arg'
     else:
         content  = generar_sud(items)
-        filename = f'pedido_sud_{date.today().strftime("%d%m%y")}.dds'
+        filename = f'sud_{suc_slug}_{date.today().strftime("%d%m%y")}.dds'
 
     return Response(
         content,
