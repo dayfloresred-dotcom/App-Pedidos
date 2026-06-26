@@ -33,7 +33,7 @@
     <table class="table table-sm">
       <thead><tr>
         <th>EAN</th><th>Producto</th><th>Laboratorio</th>
-        <th class="text-center">Solicitado</th><th class="text-center">Estado</th>
+        <th class="text-center">Solicitado</th><th class="text-center">Enviado</th><th class="text-center">Estado</th>
         <th class="text-center">Llega desde</th><th></th>
       </tr></thead>
       <tbody>
@@ -43,6 +43,15 @@
           <td>{{ it.descripcion }}</td>
           <td>{{ it.laboratorio }}</td>
           <td class="text-center fw-bold">{{ it.cantidad }}</td>
+          <td class="text-center">
+            {% set env = envios.get(it.sku, {}) %}
+            {% if env %}
+              <span class="fw-bold" style="color:#075985">{{ env.values()|sum }}</span>
+              <div class="small text-muted">{% for code, cc in env.items() %}{{ cc }} {{ code }}{% if not loop.last %} + {% endif %}{% endfor %}</div>
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
           <td class="text-center">
             {% if it.cancelado %}
               <span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 8px;border-radius:8px">✕ Cancelado</span>

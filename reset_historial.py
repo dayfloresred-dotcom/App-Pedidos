@@ -15,9 +15,13 @@ def main():
 
     conn.execute("DELETE FROM items_solicitud")
     conn.execute("DELETE FROM solicitudes")
+    try:
+        conn.execute("DELETE FROM envios")
+    except Exception:
+        pass
     # Reinicia el autoincrement de IDs (si la tabla existe)
     try:
-        conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('solicitudes','items_solicitud')")
+        conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('solicitudes','items_solicitud','envios')")
     except Exception:
         pass
     conn.commit()

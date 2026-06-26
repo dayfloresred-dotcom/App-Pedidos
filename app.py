@@ -7,7 +7,8 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        get_db, actualizar_droguerias_pendientes,
                        get_items_detalle, marcar_item_generado, desmarcar_item_generado,
                        cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal,
-                       marcar_comprado_drogueria, marcar_inexistente)
+                       marcar_comprado_drogueria, marcar_inexistente,
+                       registrar_envio, get_envios, get_envios_sucursal)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -68,7 +69,8 @@ def ver_solicitud(sol_id):
     if not sol:
         flash('Solicitud no encontrada', 'danger')
         return redirect(url_for('mis_pedidos'))
-    return render_template('confirmado.html', sol=sol, items=items)
+    envios = get_envios_sucursal(sol['sucursal'])
+    return render_template('confirmado.html', sol=sol, items=items, envios=envios)
 
 @app.route('/solicitud/<int:sol_id>/cancelar', methods=['POST'])
 @login_required
@@ -132,6 +134,8 @@ def generar_orden():
         drog_ext = base.get('drog_ext', '')
         # Detalle por sucursal con estado de orden (para marcar generado y export Quantio)
         detalle = get_items_detalle(p['sku'])
+        for d in detalle:
+            d['enviado'] = get_envios(d['sucursal'], p['sku'])
         item     = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext,
                     'es_overflow': False, 'detalle_suc': detalle}
         drog     = (p.get('drogueria') or '').upper()
@@ -143,7 +147,11 @@ def generar_orden():
             # If CD stock insufficient, add overflow order to external droguería
             overflow = p['total'] - stock_cd
             if overflow > 0 and drog_ext in ('SUD', 'SUIZO'):
-                overflow_item = {**item, 'total': overflow, 'es_overflow': True, 'detalle_suc': [], 'drog_code': ''}
+                ovf_det = get_items_detalle(p['sku'])
+                for d in ovf_det:
+                    d['enviado'] = get_envios(d['sucursal'], p['sku'])
+                ovf_code = {'SUD': 'SUD', 'SUIZO': 'SUIZO'}.get(drog_ext, '')
+                overflow_item = {**item, 'total': overflow, 'es_overflow': True, 'detalle_suc': ovf_det, 'drog_code': ovf_code}
                 orden[drog_ext].append(overflow_item)
         elif drog == 'SUD':
             orden['SUD'].append(item)
@@ -251,6 +259,27 @@ def api_inexistente():
         if sku:
             marcar_inexistente(sku)
     return jsonify({'ok': True, 'n': len(skus)})
+
+@app.route('/api/orden/enviar', methods=['POST'])
+@login_required
+@admin_required
+def api_enviar():
+    """Registra cuántas unidades se envían a una sucursal desde una droguería (acumulativo)."""
+    data = request.get_json(silent=True) or {}
+    sku  = str(data.get('sku') or '').strip()
+    suc  = (data.get('sucursal') or '').strip()
+    drog = (data.get('drogueria') or '').strip().upper()
+    try:
+        cant = int(data.get('cantidad'))
+    except (TypeError, ValueError):
+        cant = 0
+    if not (sku and suc and drog):
+        return jsonify({'error': 'Faltan datos'}), 400
+    registrar_envio(suc, sku, drog, cant)
+    # marca el item como generado (para el contador y el estado de la sucursal)
+    if cant > 0:
+        marcar_item_generado(sku, suc, drog, date.today().strftime('%d/%m/%Y'))
+    return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
 
 @app.route('/api/orden/generar-item', methods=['POST'])
 @login_required

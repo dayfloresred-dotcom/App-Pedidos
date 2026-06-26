@@ -52,6 +52,16 @@ def init_db():
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN cancelado INTEGER NOT NULL DEFAULT 0")
     if 'comprado' not in cols:
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN comprado INTEGER NOT NULL DEFAULT 0")
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS envios (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            sucursal  TEXT NOT NULL,
+            sku       TEXT NOT NULL,
+            drogueria TEXT NOT NULL,
+            cantidad  INTEGER NOT NULL,
+            UNIQUE(sucursal, sku, drogueria)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -327,6 +337,37 @@ def marcar_inexistente(sku):
         _recalc_estado_solicitud(conn, sid)
     conn.commit()
     conn.close()
+
+def registrar_envio(sucursal, sku, drogueria, cantidad):
+    """Registra (o actualiza) cuántas unidades se envían de un producto a una sucursal desde una droguería."""
+    conn = get_db()
+    try:
+        cant = int(cantidad)
+    except (TypeError, ValueError):
+        cant = 0
+    if cant > 0:
+        conn.execute('''INSERT INTO envios (sucursal, sku, drogueria, cantidad) VALUES (?,?,?,?)
+            ON CONFLICT(sucursal, sku, drogueria) DO UPDATE SET cantidad=excluded.cantidad''',
+            (sucursal, sku, drogueria, cant))
+    else:
+        conn.execute("DELETE FROM envios WHERE sucursal=? AND sku=? AND drogueria=?", (sucursal, sku, drogueria))
+    conn.commit()
+    conn.close()
+
+def get_envios(sucursal, sku):
+    conn = get_db()
+    rows = conn.execute("SELECT drogueria, cantidad FROM envios WHERE sucursal=? AND sku=?", (sucursal, sku)).fetchall()
+    conn.close()
+    return {r['drogueria']: r['cantidad'] for r in rows}
+
+def get_envios_sucursal(sucursal):
+    conn = get_db()
+    rows = conn.execute("SELECT sku, drogueria, cantidad FROM envios WHERE sucursal=?", (sucursal,)).fetchall()
+    conn.close()
+    out = {}
+    for r in rows:
+        out.setdefault(r['sku'], {})[r['drogueria']] = r['cantidad']
+    return out
 
 def cancelar_solicitud(sol_id):
     conn = get_db()
