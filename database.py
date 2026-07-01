@@ -62,6 +62,15 @@ def init_db():
             UNIQUE(sucursal, sku, drogueria)
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS omitidos (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            sucursal  TEXT NOT NULL,
+            sku       TEXT NOT NULL,
+            drogueria TEXT NOT NULL,
+            UNIQUE(sucursal, sku, drogueria)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -257,6 +266,19 @@ def cancelar_item(item_id):
     conn.close()
     return row['solicitud_id']
 
+def restaurar_item(item_id):
+    """Descancela un ítem: vuelve a pendiente y reaparece en Generar orden."""
+    conn = get_db()
+    row = conn.execute("SELECT solicitud_id FROM items_solicitud WHERE id=?", (item_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    conn.execute("UPDATE items_solicitud SET cancelado=0 WHERE id=?", (item_id,))
+    conn.execute("UPDATE solicitudes SET estado='pendiente', fecha_compra=NULL WHERE id=? AND estado='cancelado'", (row['solicitud_id'],))
+    conn.commit()
+    conn.close()
+    return row['solicitud_id']
+
 def get_item_sucursal(item_id):
     conn = get_db()
     row = conn.execute('''
@@ -377,6 +399,52 @@ def get_envios_sucursal(sucursal):
     out = {}
     for r in rows:
         out.setdefault(r['sku'], {})[r['drogueria']] = r['cantidad']
+    return out
+
+def get_envios_sucursal_drogueria(sucursal, drogueria):
+    """Unidades enviadas de cada producto a una sucursal desde una droguería (para export por sucursal)."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT sku, cantidad FROM envios WHERE sucursal=? AND drogueria=? AND cantidad>0",
+        (sucursal, drogueria)
+    ).fetchall()
+    conn.close()
+    return [{'sku': r['sku'], 'cantidad': r['cantidad']} for r in rows]
+
+def omitir_drogueria(sucursal, sku, drogueria):
+    """Marca que un producto NO se pide de esa droguería para esa sucursal (se oculta de esa tarjeta)."""
+    conn = get_db()
+    conn.execute("INSERT OR IGNORE INTO omitidos (sucursal, sku, drogueria) VALUES (?,?,?)",
+                 (sucursal, sku, drogueria))
+    conn.commit()
+    conn.close()
+
+def omitir_producto(sku, drogueria):
+    """Quita un producto de una droguería para TODAS sus sucursales pendientes."""
+    conn = get_db()
+    sucs = [r['sucursal'] for r in conn.execute(
+        "SELECT DISTINCT s.sucursal FROM items_solicitud i JOIN solicitudes s ON s.id=i.solicitud_id "
+        "WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0", (sku,)).fetchall()]
+    for suc in sucs:
+        conn.execute("INSERT OR IGNORE INTO omitidos (sucursal, sku, drogueria) VALUES (?,?,?)",
+                     (suc, sku, drogueria))
+    conn.commit()
+    conn.close()
+
+def quitar_omitido(sucursal, sku, drogueria):
+    conn = get_db()
+    conn.execute("DELETE FROM omitidos WHERE sucursal=? AND sku=? AND drogueria=?",
+                 (sucursal, sku, drogueria))
+    conn.commit()
+    conn.close()
+
+def get_omitidos_sucursal(sucursal):
+    conn = get_db()
+    rows = conn.execute("SELECT sku, drogueria FROM omitidos WHERE sucursal=?", (sucursal,)).fetchall()
+    conn.close()
+    out = {}
+    for r in rows:
+        out.setdefault(r['sku'], set()).add(r['drogueria'])
     return out
 
 def cancelar_solicitud(sol_id):

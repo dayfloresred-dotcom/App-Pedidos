@@ -16,6 +16,7 @@
     <button class="btn btn-sm text-white" style="background:#5b21b6"
       onclick="exportPedido('SUIZO')">↓ SUIZO (.arg)</button>
     {% endif %}
+    <a class="btn btn-sm text-white" style="background:#0f766e" href="/reporte/rotacion.xlsx">↓ Rotación (.xlsx)</a>
   </div>
 </div>
 {% if not orden %}
@@ -41,7 +42,6 @@
           <tbody>
             {% for it in items %}
             {% set rid = (drog ~ '_' ~ it.sku)|replace(' ', '') %}
-            {% set gens = it.detalle_suc|selectattr('enviado')|list|length %}
             {% set tot = it.detalle_suc|length %}
             <tr>
               <td class="text-muted small" style="font-size:11px">{{ it.ean[:13] }}</td>
@@ -52,11 +52,7 @@
                 {% endif %}
                 {{ it.descripcion[:32] }}
                 {% if it.es_overflow %}<span class="ms-1" style="background:#e0f2fe;color:#075985;font-size:10px;padding:1px 6px;border-radius:8px">excedente CD</span>{% endif %}
-                {% if tot > 0 %}
-                <span class="gencount-{{ rid }}" style="font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;
-                  background:{% if gens==tot %}#dcfce7{% elif gens>0 %}#fef9c3{% else %}#f1f5f9{% endif %};
-                  color:{% if gens==tot %}#166534{% elif gens>0 %}#854d0e{% else %}#64748b{% endif %}">{{ gens }}/{{ tot }} env.</span>
-                {% endif %}
+
               </td>
               <td>{{ it.sucursales_str|safe }}</td>
               {% if drog == 'DROGUERIA RED' %}
@@ -79,8 +75,8 @@
                 <button class="btn btn-sm btn-link text-secondary p-0" title="Ocultar"
                   onclick="this.closest('tr').remove()">&times;</button>
                 {% else %}
-                <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar producto (todas las sucursales)"
-                  onclick="cancelarProducto('{{ it.sku }}')">&times;</button>
+                <button class="btn btn-sm btn-link text-danger p-0" title="Quitar producto de esta droguería"
+                  onclick="omitirProducto('{{ it.sku }}','{{ it.drog_code }}')">&times;</button>
                 {% endif %}
               </td>
             </tr>
@@ -94,16 +90,18 @@
                     <div class="d-flex align-items-center gap-2 border rounded px-2 py-1" style="background:#fff">
                       <span class="small fw-bold">{{ d.sucursal }}</span>
                       <span class="small text-muted">de {{ d.cantidad }}</span>
-                      <input type="number" min="0" value="{{ d.enviado.get(it.drog_code) if d.enviado.get(it.drog_code) is not none else d.cantidad }}" style="width:52px"
-                        class="form-control form-control-sm env-input{% if drog == 'DROGUERIA RED' %} qty-cd{% endif %}"
+                      {% if it.drog_code %}
+                      <input type="number" min="0" value="{{ d.cantidad }}" style="width:52px"
+                        class="form-control form-control-sm env-input"
                         data-sku="{{ it.sku }}" data-sucursal="{{ d.sucursal }}" data-code="{{ it.drog_code }}"
-                        title="Cantidad a enviar desde {{ it.drog_code }}">
-                      <button class="btn btn-sm mark-btn py-0 px-2 {% if d.enviado.get(it.drog_code) %}btn-success{% else %}btn-outline-success{% endif %}"
-                        onclick="enviarItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}','{{ rid }}', this)">
-                        {% if d.enviado.get(it.drog_code) %}&#10003; Enviado{% else %}Enviar{% endif %}
-                      </button>
-                      <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar para esta sucursal"
-                        onclick="cancelarSucursal('{{ it.sku }}','{{ d.sucursal }}')">&times;</button>
+                        title="Cantidad a enviar">
+                      <button class="btn btn-sm btn-outline-success py-0 px-2"
+                        onclick="enviarItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}', this)">Enviar</button>
+                      <button class="btn btn-sm btn-outline-primary py-0 px-2" title="Cubrir por rotación (stock interno)"
+                        onclick="rotacionItem('{{ it.sku }}','{{ d.sucursal }}', this)">Rotación</button>
+                      <button class="btn btn-sm btn-link text-danger p-0" title="Quitar de esta droguería"
+                        onclick="omitirItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}')">&times;</button>
+                      {% endif %}
                     </div>
                     {% endfor %}
                   </div>
@@ -173,75 +171,56 @@ function exportPedido(code) {
   const sel = document.getElementById('export-suc');
   if (!sel || !sel.value) { alert('Elegí una sucursal'); return; }
   const suc = sel.value;
-  const sucAttr = suc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  const items = [];
-  document.querySelectorAll(`.env-input[data-sucursal="${sucAttr}"][data-code="${code}"]`).forEach(inp => {
-    const cant = parseInt(inp.value, 10);
-    if (cant > 0) items.push({sku: inp.dataset.sku, cantidad: cant});
-  });
-  if (!items.length) { alert('Esa sucursal no tiene cantidades cargadas para ' + code); return; }
   const url = code === 'CD' ? '/exportar-quantio' : '/exportar/' + code;
-  descargar(url, {sucursal: suc, items}, 'pedido_' + code.toLowerCase());
+  descargar(url, {sucursal: suc}, 'pedido_' + code.toLowerCase());
 }
 
-async function enviarItem(sku, suc, code, rid, btn) {
+async function enviarItem(sku, suc, code, btn) {
   const pill = btn.closest('div');
   const inp  = pill.querySelector('.env-input');
   const cant = parseInt(inp.value, 10) || 0;
+  if (cant <= 0) { alert('Poné una cantidad mayor a 0'); return; }
   btn.disabled = true;
   const res = await fetch('/api/orden/enviar', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({sku, sucursal: suc, drogueria: code, cantidad: cant})
   });
-  let d = {};
-  try { d = await res.json(); } catch (_) {}
-  btn.disabled = false;
-  if (res.ok && d.ok) {
-    if (cant > 0) {
-      btn.textContent = '\u2713 Enviado';
-      btn.className = 'btn btn-sm mark-btn py-0 px-2 btn-success';
-    } else {
-      btn.textContent = 'Enviar';
-      btn.className = 'btn btn-sm mark-btn py-0 px-2 btn-outline-success';
-    }
-    updateGenCount(rid);
-  } else {
-    alert(d.error || 'No se pudo registrar el envío.');
-  }
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) location.reload(); else { btn.disabled = false; alert(d.error || 'No se pudo enviar.'); }
 }
 
-function updateGenCount(rid) {
-  const row = document.querySelector('.detalle-' + CSS.escape(rid));
-  if (!row) return;
-  const tot = row.querySelectorAll('button.mark-btn').length;
-  const on  = row.querySelectorAll('button.mark-btn.btn-success').length;
-  const badge = document.querySelector('.gencount-' + CSS.escape(rid));
-  if (badge) {
-    badge.textContent = on + '/' + tot + ' env.';
-    const all = on === tot;
-    badge.style.background = all ? '#dcfce7' : (on > 0 ? '#fef9c3' : '#f1f5f9');
-    badge.style.color      = all ? '#166534' : (on > 0 ? '#854d0e' : '#64748b');
-  }
-}
-
-async function cancelarProducto(sku) {
-  if (!confirm('¿Cancelar este producto para TODAS las sucursales que lo pidieron?\nSe marcará como cancelado en sus pedidos.')) return;
-  const res = await fetch('/api/orden/cancelar-producto', {
+async function rotacionItem(sku, suc, btn) {
+  const pill = btn.closest('div');
+  const inp  = pill.querySelector('.env-input');
+  const cant = parseInt(inp.value, 10) || 0;
+  if (cant <= 0) { alert('Poné una cantidad mayor a 0'); return; }
+  if (!confirm('¿Cubrir ' + cant + ' u. de ' + suc + ' por ROTACIÓN (stock interno)?')) return;
+  btn.disabled = true;
+  const res = await fetch('/api/orden/rotacion', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({sku})
+    body: JSON.stringify({sku, sucursal: suc, cantidad: cant})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo cancelar.');
+  if (res.ok && d.ok) location.reload(); else { btn.disabled = false; alert(d.error || 'No se pudo.'); }
 }
 
-async function cancelarSucursal(sku, suc) {
-  if (!confirm('¿Cancelar este producto solo para ' + suc + '?')) return;
-  const res = await fetch('/api/orden/cancelar-item', {
+async function omitirItem(sku, suc, code) {
+  const res = await fetch('/api/orden/omitir', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({sku, sucursal: suc})
+    body: JSON.stringify({sku, sucursal: suc, drogueria: code})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo cancelar.');
+  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo.');
+}
+
+async function omitirProducto(sku, code) {
+  if (!confirm('¿Quitar este producto de esta droguería (todas las sucursales)?')) return;
+  const res = await fetch('/api/orden/omitir-producto', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sku, drogueria: code})
+  });
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo.');
 }
 
 async function marcarComprado(drog) {

@@ -17,6 +17,7 @@ def main():
     conn.execute("DELETE FROM solicitudes")
     try:
         conn.execute("DELETE FROM envios")
+        conn.execute("DELETE FROM omitidos")
     except Exception:
         pass
     # Reinicia el autoincrement de IDs (si la tabla existe)

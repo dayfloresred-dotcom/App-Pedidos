@@ -8,7 +8,8 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        get_items_detalle, marcar_item_generado, desmarcar_item_generado,
                        cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal,
                        marcar_comprado_drogueria, marcar_inexistente,
-                       registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria)
+                       registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
+                       get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -122,46 +123,70 @@ def generar_orden():
     prod_map = {p['sku']: p for p in load_productos()}
     orden    = {'DROGUERIA RED': [], 'SUD': [], 'SUIZO': [], 'SIN_PRECIO': []}
 
+    conn = get_db()
+    omit_map = {}
+    for r in conn.execute("SELECT sucursal, sku, drogueria FROM omitidos").fetchall():
+        omit_map.setdefault((r['sucursal'], r['sku']), set()).add(r['drogueria'])
+    conn.close()
+
+    def visibles(detalle, sku, code):
+        """Pills que todavía hay que gestionar en la tarjeta de esa droguería."""
+        out = []
+        for d in detalle:
+            env = d['enviado']
+            if env.get(code):
+                continue          # ya enviado desde esta droguería
+            if env.get('ROT'):
+                continue          # cubierto por rotación
+            if code in omit_map.get((d['sucursal'], sku), set()):
+                continue          # quitado de esta droguería
+            out.append(d)
+        return out
+
     for p in prods:
+        sku = p['sku']
         suc_list = [s.strip() for s in (p.get('sucursales') or '').split(',') if s.strip()]
         chips = ' '.join(f'<span class="chip-suc">{s}</span>' for s in suc_list[:3])
         if len(suc_list) > 3:
             chips += f' <span class="chip-suc">+{len(suc_list)-3}</span>'
-        # Add CD stock quantity
-        base     = prod_map.get(p['sku'], {})
+        base     = prod_map.get(sku, {})
         raw_cd   = base.get('stock_cd', 0)
         stock_cd = raw_cd if isinstance(raw_cd, int) else (1 if raw_cd == 'SI' else 0)
         drog_ext = base.get('drog_ext', '')
-        # Detalle por sucursal con estado de orden (para marcar generado y export Quantio)
-        detalle = get_items_detalle(p['sku'])
+        detalle = get_items_detalle(sku)
         for d in detalle:
-            d['enviado'] = get_envios(d['sucursal'], p['sku'])
-        item     = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext,
-                    'es_overflow': False, 'detalle_suc': detalle}
-        drog     = (p.get('drogueria') or '').upper()
-        # Código de droguería que se registra al marcar generado (lo que ve la sucursal)
-        DROG_CODE = {'DROGUERIA RED': 'CD', 'SUD': 'SUD', 'SUIZO': 'SUIZO'}
-        item['drog_code'] = DROG_CODE.get(drog, '')
+            d['enviado'] = get_envios(d['sucursal'], sku)
+        drog = (p.get('drogueria') or '').upper()
+        base_item = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext}
+
         if drog == 'DROGUERIA RED':
-            orden['DROGUERIA RED'].append(item)
-            # If CD stock insufficient, add overflow order to external droguería
+            vis_cd = visibles(detalle, sku, 'CD')
+            if vis_cd:
+                orden['DROGUERIA RED'].append({**base_item, 'es_overflow': False,
+                    'detalle_suc': vis_cd, 'drog_code': 'CD'})
             overflow = p['total'] - stock_cd
             if overflow > 0 and drog_ext in ('SUD', 'SUIZO'):
-                ovf_det = get_items_detalle(p['sku'])
-                for d in ovf_det:
-                    d['enviado'] = get_envios(d['sucursal'], p['sku'])
-                ovf_code = {'SUD': 'SUD', 'SUIZO': 'SUIZO'}.get(drog_ext, '')
-                overflow_item = {**item, 'total': overflow, 'es_overflow': True, 'detalle_suc': ovf_det, 'drog_code': ovf_code}
-                orden[drog_ext].append(overflow_item)
-        elif drog == 'SUD':
-            orden['SUD'].append(item)
-        elif drog == 'SUIZO':
-            orden['SUIZO'].append(item)
+                vis_ext = visibles(detalle, sku, drog_ext)
+                if vis_ext:
+                    orden[drog_ext].append({**base_item, 'total': overflow, 'es_overflow': True,
+                        'detalle_suc': vis_ext, 'drog_code': drog_ext})
+        elif drog in ('SUD', 'SUIZO'):
+            vis = visibles(detalle, sku, drog)
+            if vis:
+                orden[drog].append({**base_item, 'es_overflow': False,
+                    'detalle_suc': vis, 'drog_code': drog})
         else:
-            orden['SIN_PRECIO'].append(item)
+            orden['SIN_PRECIO'].append({**base_item, 'es_overflow': False,
+                'detalle_suc': detalle, 'drog_code': ''})
 
-    # Sucursales presentes en el pedido (para el desplegable de export por sucursal)
-    sucs_orden = sorted({d['sucursal'] for its in orden.values() for it in its for d in it['detalle_suc']})
+    conn = get_db()
+    sucs_set = {r['sucursal'] for r in conn.execute("SELECT DISTINCT sucursal FROM envios WHERE cantidad>0").fetchall()}
+    conn.close()
+    for its in orden.values():
+        for it in its:
+            for d in it['detalle_suc']:
+                sucs_set.add(d['sucursal'])
+    sucs_orden = sorted(sucs_set)
 
     return render_template('generar_orden.html',
         orden={k: v for k, v in orden.items() if v},
@@ -349,6 +374,68 @@ def api_cancelar_item_id():
     cancelar_item(item_id)
     return jsonify({'ok': True})
 
+@app.route('/api/orden/rotacion', methods=['POST'])
+@login_required
+@admin_required
+def api_rotacion():
+    """Marca que un producto para una sucursal se cubre por ROTACIÓN (stock interno)."""
+    data = request.get_json(silent=True) or {}
+    sku  = str(data.get('sku') or '').strip()
+    suc  = (data.get('sucursal') or '').strip()
+    try:
+        cant = int(data.get('cantidad'))
+    except (TypeError, ValueError):
+        cant = 0
+    if not (sku and suc):
+        return jsonify({'error': 'Faltan datos'}), 400
+    registrar_envio(suc, sku, 'ROT', cant)
+    if cant > 0:
+        marcar_item_generado(sku, suc, 'ROT', date.today().strftime('%d/%m/%Y'))
+    return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
+
+@app.route('/api/orden/omitir', methods=['POST'])
+@login_required
+@admin_required
+def api_omitir():
+    """Quita un producto de UNA droguería para una sucursal (se oculta de esa tarjeta)."""
+    data = request.get_json(silent=True) or {}
+    sku  = str(data.get('sku') or '').strip()
+    suc  = (data.get('sucursal') or '').strip()
+    drog = (data.get('drogueria') or '').strip().upper()
+    if not (sku and suc and drog):
+        return jsonify({'error': 'Faltan datos'}), 400
+    omitir_drogueria(suc, sku, drog)
+    return jsonify({'ok': True})
+
+@app.route('/api/orden/omitir-producto', methods=['POST'])
+@login_required
+@admin_required
+def api_omitir_producto():
+    data = request.get_json(silent=True) or {}
+    sku  = str(data.get('sku') or '').strip()
+    drog = (data.get('drogueria') or '').strip().upper()
+    if not (sku and drog):
+        return jsonify({'error': 'Faltan datos'}), 400
+    omitir_producto(sku, drog)
+    return jsonify({'ok': True})
+
+@app.route('/api/item/restaurar', methods=['POST'])
+@login_required
+def api_restaurar_item():
+    """Restaura un ítem cancelado (vuelve a Generar orden). Permiso: admin o dueño."""
+    data = request.get_json(silent=True) or {}
+    try:
+        item_id = int(data.get('item_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Falta el ítem'}), 400
+    suc = get_item_sucursal(item_id)
+    if suc is None:
+        return jsonify({'error': 'Ítem no encontrado'}), 404
+    if session.get('rol') != 'admin' and session.get('username') != suc:
+        return jsonify({'error': 'Sin permiso'}), 403
+    restaurar_item(item_id)
+    return jsonify({'ok': True})
+
 # ── Export routes ──────────────────────────────────────────────────────────
 @app.route('/exportar/<drogueria>', methods=['GET', 'POST'])
 @login_required
@@ -363,22 +450,16 @@ def exportar(drogueria):
 
     prod_map = {p['sku']: p for p in load_productos()}
     items = []
-    for it in data.get('items', []):
-        try:
-            cant = max(0, int(it['cantidad']))
-        except (KeyError, ValueError, TypeError):
-            continue
-        if cant <= 0:
-            continue
-        base = prod_map.get(str(it.get('sku')), {})
+    for r in get_envios_sucursal_drogueria(sucursal, drog):
+        base = prod_map.get(r['sku'], {})
         items.append({
-            'ean':         it.get('ean') or base.get('ean', ''),
+            'ean':         base.get('ean', ''),
             'troquel':     base.get('troquel', '0000000'),
             'descripcion': base.get('descripcion', ''),
-            'cantidad':    cant,
+            'cantidad':    r['cantidad'],
         })
     if not items:
-        return jsonify({'error': f'{sucursal} no tiene cantidades cargadas para {drog}.'}), 400
+        return jsonify({'error': f'{sucursal} no tiene envíos cargados para {drog}.'}), 400
 
     suc_slug = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
     if drog == 'SUIZO':
@@ -406,22 +487,16 @@ def exportar_quantio():
 
     prod_map = {p['sku']: p for p in load_productos()}
     items = []
-    for it in data.get('items', []):
-        try:
-            cant = max(0, int(it['cantidad']))
-        except (KeyError, ValueError, TypeError):
-            continue
-        if cant <= 0:
-            continue
-        base = prod_map.get(str(it.get('sku')), {})
+    for r in get_envios_sucursal_drogueria(sucursal, 'CD'):
+        base = prod_map.get(r['sku'], {})
         items.append({
-            'ean':         it.get('ean') or base.get('ean', ''),
-            'troquel':     base.get('troquel_pres') or base.get('troquel') or '',
-            'cantidad':    cant,
+            'ean':     base.get('ean', ''),
+            'troquel': base.get('troquel_pres') or base.get('troquel') or '',
+            'cantidad': r['cantidad'],
         })
 
     if not items:
-        return jsonify({'error': 'Sin productos para esta sucursal'}), 400
+        return jsonify({'error': f'{sucursal} no tiene envíos cargados para CD.'}), 400
 
     content   = generar_quantio(items)
     suc_slug  = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
@@ -431,6 +506,56 @@ def exportar_quantio():
         mimetype='text/plain',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
+
+@app.route('/reporte/rotacion.xlsx')
+@login_required
+@admin_required
+def reporte_rotacion():
+    """Excel con movimientos de rotación sugeridos: de sucursales con stock alto y 0 ventas
+    hacia sucursales con stock 0 que sí venden."""
+    import io, openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    UMBRAL = 2  # 'stock alto' del donante
+    prods = load_productos()
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Rotacion'
+    ws.append(['EAN', 'Producto', 'Laboratorio', 'Desde (sucursal)', 'Stock donante',
+               'Hacia (sucursal)', 'Ventas receptor', 'Cantidad a mover'])
+    for p in prods:
+        stock  = p.get('stock_real', {}) or {}
+        ventas = p.get('ventas', {}) or {}
+        sucs = set(stock) | set(ventas)
+        donors = [(su, stock.get(su, 0)) for su in sucs if stock.get(su, 0) >= UMBRAL and ventas.get(su, 0) == 0]
+        recept = [(su, ventas.get(su, 0)) for su in sucs if stock.get(su, 0) == 0 and ventas.get(su, 0) > 0]
+        if not donors or not recept:
+            continue
+        donors = sorted(donors, key=lambda x: -x[1])
+        recept = sorted(recept, key=lambda x: -x[1])
+        avail = [[su, q] for su, q in donors]          # stock disponible mutable
+        orig  = {su: q for su, q in donors}            # stock original (para mostrar)
+        for rsuc, rneed in recept:
+            need = rneed
+            for row in avail:
+                if need <= 0:
+                    break
+                if row[1] <= 0:
+                    continue
+                move = min(row[1], need)
+                ws.append([p['ean'], (p['descripcion'] or '')[:45], p['laboratorio'],
+                           row[0], orig[row[0]], rsuc, rneed, move])
+                row[1] -= move
+                need   -= move
+    # estilo cabecera
+    fill = PatternFill('solid', start_color='1F4E78')
+    for c in ws[1]:
+        c.font = Font(bold=True, color='FFFFFF'); c.fill = fill; c.alignment = Alignment(horizontal='center')
+    for col, w in {'A':15,'B':45,'C':22,'D':16,'E':13,'F':16,'G':14,'H':15}.items():
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = 'A2'
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    filename = f'rotacion_{date.today().strftime("%d%m%y")}.xlsx'
+    return Response(buf.read(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
 @app.route('/actualizar-datos', methods=['GET', 'POST'])
 @login_required
