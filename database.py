@@ -219,6 +219,8 @@ def _recalc_estado_solicitud(conn, sol_id):
     if activos and all(r['comprado'] for r in activos):
         fecha = datetime.now().strftime('%d/%m/%Y')
         conn.execute("UPDATE solicitudes SET estado='comprado', fecha_compra=? WHERE id=? AND estado='pendiente'", (fecha, sol_id))
+    elif activos and any(not r['comprado'] for r in activos):
+        conn.execute("UPDATE solicitudes SET estado='pendiente', fecha_compra=NULL WHERE id=? AND estado='comprado'", (sol_id,))
 
 def cancelar_producto(sku):
     """Cancela un producto para TODAS las sucursales con pedido pendiente."""
@@ -400,6 +402,35 @@ def get_envios_sucursal(sucursal):
     for r in rows:
         out.setdefault(r['sku'], {})[r['drogueria']] = r['cantidad']
     return out
+
+def actualizar_comprado_por_envio(sucursal, sku):
+    """Si lo enviado (todas las droguerías + rotación) cubre lo solicitado por la sucursal,
+    marca esos ítems como comprados (=> 'Pedido realizado'). Si no alcanza, lo revierte."""
+    conn = get_db()
+    req = conn.execute("""
+        SELECT COALESCE(SUM(i.cantidad),0) FROM items_solicitud i
+        JOIN solicitudes s ON s.id=i.solicitud_id
+        WHERE i.sku=? AND s.sucursal=? AND s.estado IN ('pendiente','comprado') AND i.cancelado=0
+    """, (sku, sucursal)).fetchone()[0]
+    sent = conn.execute("SELECT COALESCE(SUM(cantidad),0) FROM envios WHERE sucursal=? AND sku=?",
+                        (sucursal, sku)).fetchone()[0]
+    from datetime import datetime as _dt
+    fecha = _dt.now().strftime('%d/%m/%Y')
+    cubierto = 1 if (req > 0 and sent >= req) else 0
+    conn.execute("""
+        UPDATE items_solicitud SET comprado=?, fecha_orden=?
+        WHERE sku=? AND cancelado=0 AND solicitud_id IN (
+            SELECT id FROM solicitudes WHERE sucursal=? AND estado IN ('pendiente','comprado')
+        )
+    """, (cubierto, fecha if cubierto else None, sku, sucursal))
+    sols = [r['solicitud_id'] for r in conn.execute("""
+        SELECT DISTINCT i.solicitud_id FROM items_solicitud i
+        JOIN solicitudes s ON s.id=i.solicitud_id WHERE i.sku=? AND s.sucursal=?
+    """, (sku, sucursal)).fetchall()]
+    for sid in sols:
+        _recalc_estado_solicitud(conn, sid)
+    conn.commit()
+    conn.close()
 
 def get_envios_sucursal_drogueria(sucursal, drogueria):
     """Unidades enviadas de cada producto a una sucursal desde una droguería (para export por sucursal)."""

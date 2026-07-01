@@ -3,6 +3,14 @@
 <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
   <h5 class="mb-0">Generar orden de compra</h5>
   <span class="text-muted small">Fecha: {{ hoy }}</span>
+  <form method="get" class="d-flex align-items-center gap-1">
+    <span class="small text-muted">Ver sucursal:</span>
+    <select name="suc" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for su in sucursales %}<option value="{{ su }}" {% if filtro_suc==su %}selected{% endif %}>{{ su }}</option>{% endfor %}
+    </select>
+    {% if filtro_suc %}<a href="{{ url_for('generar_orden') }}" class="btn btn-sm btn-outline-secondary">✕</a>{% endif %}
+  </form>
   <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
     {% if sucs_orden %}
     <span class="small text-muted">Exportar pedido de:</span>

@@ -9,7 +9,8 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal,
                        marcar_comprado_drogueria, marcar_inexistente,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
-                       get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item)
+                       get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item,
+                       actualizar_comprado_por_envio)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -119,7 +120,8 @@ def consolidado():
 @login_required
 @admin_required
 def generar_orden():
-    prods    = get_consolidado()
+    filtro_suc = request.args.get('suc', '')
+    prods    = get_consolidado(sucursal_filtro=filtro_suc or None)
     prod_map = {p['sku']: p for p in load_productos()}
     orden    = {'DROGUERIA RED': [], 'SUD': [], 'SUIZO': [], 'SIN_PRECIO': []}
 
@@ -154,6 +156,8 @@ def generar_orden():
         stock_cd = raw_cd if isinstance(raw_cd, int) else (1 if raw_cd == 'SI' else 0)
         drog_ext = base.get('drog_ext', '')
         detalle = get_items_detalle(sku)
+        if filtro_suc:
+            detalle = [d for d in detalle if d['sucursal'] == filtro_suc]
         for d in detalle:
             d['enviado'] = get_envios(d['sucursal'], sku)
         drog = (p.get('drogueria') or '').upper()
@@ -191,6 +195,8 @@ def generar_orden():
     return render_template('generar_orden.html',
         orden={k: v for k, v in orden.items() if v},
         sucs_orden=sucs_orden,
+        sucursales=SUCURSAL_NAMES,
+        filtro_suc=filtro_suc,
         hoy=date.today().strftime('%d/%m/%Y'))
 
 # ── API endpoints ──────────────────────────────────────────────────────────
@@ -301,9 +307,9 @@ def api_enviar():
     if not (sku and suc and drog):
         return jsonify({'error': 'Faltan datos'}), 400
     registrar_envio(suc, sku, drog, cant)
-    # marca el item como generado (para el contador y el estado de la sucursal)
     if cant > 0:
         marcar_item_generado(sku, suc, drog, date.today().strftime('%d/%m/%Y'))
+    actualizar_comprado_por_envio(suc, sku)
     return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
 
 @app.route('/api/orden/generar-item', methods=['POST'])
@@ -391,6 +397,7 @@ def api_rotacion():
     registrar_envio(suc, sku, 'ROT', cant)
     if cant > 0:
         marcar_item_generado(sku, suc, 'ROT', date.today().strftime('%d/%m/%Y'))
+    actualizar_comprado_por_envio(suc, sku)
     return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
 
 @app.route('/api/orden/omitir', methods=['POST'])
