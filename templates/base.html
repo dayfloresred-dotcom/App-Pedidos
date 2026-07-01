@@ -8,9 +8,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg" style="background:#8FA37E">
+<nav class="navbar navbar-expand-lg" style="background:#A5685E">
   <div class="container-fluid">
-    <span class="navbar-brand fw-bold" style="color:#000">Farmacias Red</span>
+    <span class="navbar-brand fw-bold" style="color:#fff">Farmacias Red</span>
     <div class="d-flex gap-2 flex-wrap">
       {% if session.get('username') %}
         <a href="{{ url_for('nueva_solicitud') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'nueva_solicitud' %}active{% endif %}">Nueva solicitud</a>
@@ -20,16 +20,17 @@
           <a href="{{ url_for('generar_orden') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'generar_orden' %}active{% endif %}">Generar orden</a>
           <a href="{{ url_for('actualizar_datos') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'actualizar_datos' %}active{% endif %}">↑ Actualizar datos</a>
         {% endif %}
-        <span class="small align-self-center ms-2" style="color:#000">{{ session.get('username') }}</span>
+        <span class="small align-self-center ms-2" style="color:#fff">{{ session.get('username') }}</span>
         <a href="{{ url_for('logout') }}" class="btn btn-sm nav-btn">Salir</a>
       {% endif %}
     </div>
   </div>
 </nav>
 <style>
-  .nav-btn { background:#3E5236; color:#fff !important; border:1px solid #2A3A25; }
-  .nav-btn:hover { background:#2A3A25; color:#fff !important; }
-  .nav-btn.active { background:#2A3A25; color:#fff !important; }
+  .nav-btn { background:#111; color:#fff !important; border:1px solid #000; }
+  body { background:#D3C4B4; }
+  .nav-btn:hover { background:#000; color:#fff !important; }
+  .nav-btn.active { background:#000; color:#fff !important; }
 </style>
 <div class="container-fluid py-3">
   {% with messages = get_flashed_messages(with_categories=true) %}
