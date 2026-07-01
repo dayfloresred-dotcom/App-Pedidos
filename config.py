@@ -49,3 +49,9 @@ SUCURSALES = {
 SUCURSAL_NAMES = list(SUCURSALES.values())
 
 ADMIN_USER = 'admin'
+
+from datetime import datetime as _datetime, timezone as _timezone, timedelta as _timedelta
+
+def now_local():
+    """Hora local de Argentina (UTC-3, sin horario de verano)."""
+    return _datetime.now(_timezone.utc).astimezone(_timezone(_timedelta(hours=-3)))

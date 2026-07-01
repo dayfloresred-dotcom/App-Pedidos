@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from config import DB_PATH
+from config import DB_PATH, now_local
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -84,7 +84,7 @@ def generar_numero():
 def crear_solicitud(sucursal, creado_por, items):
     conn = get_db()
     numero = generar_numero()
-    fecha  = datetime.now().strftime('%d/%m/%Y %H:%M')
+    fecha  = now_local().strftime('%d/%m/%Y %H:%M')
     conn.execute(
         'INSERT INTO solicitudes (numero, sucursal, creado_por, fecha_solicitud) VALUES (?,?,?,?)',
         (numero, sucursal, creado_por, fecha)
@@ -217,7 +217,7 @@ def _recalc_estado_solicitud(conn, sol_id):
         return
     activos = [r for r in rows if not r['cancelado']]
     if activos and all(r['comprado'] for r in activos):
-        fecha = datetime.now().strftime('%d/%m/%Y')
+        fecha = now_local().strftime('%d/%m/%Y')
         conn.execute("UPDATE solicitudes SET estado='comprado', fecha_compra=? WHERE id=? AND estado='pendiente'", (fecha, sol_id))
     elif activos and any(not r['comprado'] for r in activos):
         conn.execute("UPDATE solicitudes SET estado='pendiente', fecha_compra=NULL WHERE id=? AND estado='comprado'", (sol_id,))
@@ -414,8 +414,7 @@ def actualizar_comprado_por_envio(sucursal, sku):
     """, (sku, sucursal)).fetchone()[0]
     sent = conn.execute("SELECT COALESCE(SUM(cantidad),0) FROM envios WHERE sucursal=? AND sku=?",
                         (sucursal, sku)).fetchone()[0]
-    from datetime import datetime as _dt
-    fecha = _dt.now().strftime('%d/%m/%Y')
+    fecha = now_local().strftime('%d/%m/%Y')
     cubierto = 1 if (req > 0 and sent >= req) else 0
     conn.execute("""
         UPDATE items_solicitud SET comprado=?, fecha_orden=?

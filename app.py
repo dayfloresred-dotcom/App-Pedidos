@@ -1,7 +1,7 @@
 import os
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify, flash, Response
 from datetime import date, datetime
-from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER
+from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER, now_local
 from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas_solicitudes,
                        get_consolidado, get_detalle_por_sucursal, marcar_comprado, cancelar_solicitud,
                        get_db, actualizar_droguerias_pendientes,
@@ -197,7 +197,7 @@ def generar_orden():
         sucs_orden=sucs_orden,
         sucursales=SUCURSAL_NAMES,
         filtro_suc=filtro_suc,
-        hoy=date.today().strftime('%d/%m/%Y'))
+        hoy=now_local().strftime('%d/%m/%Y'))
 
 # ── API endpoints ──────────────────────────────────────────────────────────
 @app.route('/api/productos')
@@ -273,7 +273,7 @@ def api_marcar_comprado():
     """Marca como comprados SOLO los productos de esa droguería (a nivel item)."""
     data  = request.get_json(silent=True) or {}
     drog  = (data.get('drogueria') or '').strip()
-    fecha = data.get('fecha') or date.today().strftime('%d/%m/%Y')
+    fecha = data.get('fecha') or now_local().strftime('%d/%m/%Y')
     if not drog:
         return jsonify({'error': 'Falta droguería'}), 400
     n = marcar_comprado_drogueria(drog, fecha)
@@ -308,7 +308,7 @@ def api_enviar():
         return jsonify({'error': 'Faltan datos'}), 400
     registrar_envio(suc, sku, drog, cant)
     if cant > 0:
-        marcar_item_generado(sku, suc, drog, date.today().strftime('%d/%m/%Y'))
+        marcar_item_generado(sku, suc, drog, now_local().strftime('%d/%m/%Y'))
     actualizar_comprado_por_envio(suc, sku)
     return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
 
@@ -323,7 +323,7 @@ def api_generar_item():
     drog = (data.get('drogueria') or '').strip().upper()
     if not (sku and suc and drog):
         return jsonify({'error': 'Faltan datos'}), 400
-    marcar_item_generado(sku, suc, drog, date.today().strftime('%d/%m/%Y'))
+    marcar_item_generado(sku, suc, drog, now_local().strftime('%d/%m/%Y'))
     return jsonify({'ok': True})
 
 @app.route('/api/orden/desmarcar-item', methods=['POST'])
@@ -396,7 +396,7 @@ def api_rotacion():
         return jsonify({'error': 'Faltan datos'}), 400
     registrar_envio(suc, sku, 'ROT', cant)
     if cant > 0:
-        marcar_item_generado(sku, suc, 'ROT', date.today().strftime('%d/%m/%Y'))
+        marcar_item_generado(sku, suc, 'ROT', now_local().strftime('%d/%m/%Y'))
     actualizar_comprado_por_envio(suc, sku)
     return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
 
@@ -471,10 +471,10 @@ def exportar(drogueria):
     suc_slug = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
     if drog == 'SUIZO':
         content  = generar_suizo(items)
-        filename = f'suizo_{suc_slug}_{date.today().strftime("%d%m%y")}.arg'
+        filename = f'suizo_{suc_slug}_{now_local().strftime("%d%m%y")}.arg'
     else:
         content  = generar_sud(items)
-        filename = f'sud_{suc_slug}_{date.today().strftime("%d%m%y")}.dds'
+        filename = f'sud_{suc_slug}_{now_local().strftime("%d%m%y")}.dds'
 
     return Response(
         content,
@@ -507,7 +507,7 @@ def exportar_quantio():
 
     content   = generar_quantio(items)
     suc_slug  = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
-    filename  = f'quantio_{suc_slug}_{date.today().strftime("%d%m%y")}.txt'
+    filename  = f'quantio_{suc_slug}_{now_local().strftime("%d%m%y")}.txt'
     return Response(
         content.encode('latin-1', errors='replace'),
         mimetype='text/plain',
@@ -559,7 +559,7 @@ def reporte_rotacion():
         ws.column_dimensions[col].width = w
     ws.freeze_panes = 'A2'
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
-    filename = f'rotacion_{date.today().strftime("%d%m%y")}.xlsx'
+    filename = f'rotacion_{now_local().strftime("%d%m%y")}.xlsx'
     return Response(buf.read(),
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'})
