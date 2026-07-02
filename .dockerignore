@@ -1,0 +1,14 @@
+.git
+.gitattributes
+.gitignore
+.claude
+.remember
+__pycache__
+*.pyc
+*.pkl
+*.db
+*.db-journal
+data/
+docs/
+Dockerfile
+.dockerignore

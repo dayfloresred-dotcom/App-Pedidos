@@ -20,6 +20,10 @@ app = Flask(__name__)
 app.secret_key = SECRET_KEY
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+@app.route('/health')
+def health():
+    return {'status': 'ok'}
+
 # ── Auth ───────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():

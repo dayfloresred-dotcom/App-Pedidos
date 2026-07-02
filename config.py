@@ -1,21 +1,33 @@
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH  = os.path.join(BASE_DIR, 'pedidos.db')
 
-SECRET_KEY = 'farmacias-red-2026-secret'
+# En contenedor (VPS) el estado persistente vive en un volumen: setear
+# PEDIDOS_DB_PATH y PEDIDOS_DATA_DIR. Sin esas variables se comporta igual
+# que siempre (PythonAnywhere / local).
+DB_PATH = os.environ.get('PEDIDOS_DB_PATH') or os.path.join(BASE_DIR, 'pedidos.db')
 
-# Mail
+# Secret de sesiones: SIEMPRE setear SECRET_KEY en produccion. Sin la
+# variable se genera una clave aleatoria al arrancar (las sesiones se
+# invalidan en cada reinicio — aceptable solo en desarrollo).
+SECRET_KEY = os.environ.get('SECRET_KEY') or __import__('secrets').token_hex(32)
+
+# Mail: sin MAIL_USERNAME/MAIL_PASSWORD las notificaciones se omiten
+# (mail_service ya contempla ese caso). Usar contraseña de aplicacion de Gmail.
 MAIL_SERVER   = 'smtp.gmail.com'
 MAIL_PORT     = 465
 MAIL_USE_TLS  = True
-MAIL_USERNAME = 'dayflores.red@gmail.com'
-MAIL_PASSWORD = 'koft updi dvzh rchz'
-MAIL_ADMIN    = 'jenarraigada.red@gmail.com'
+MAIL_USERNAME = os.environ.get('MAIL_USERNAME', '')
+MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
+MAIL_ADMIN    = os.environ.get('MAIL_ADMIN') or 'jenarraigada.red@gmail.com'
 
-# Data directory: usa Necesidad Sucursales si existe (local), si no usa data/ (Railway/cloud)
+# Data directory, por prioridad:
+#   1. PEDIDOS_DATA_DIR (contenedor, volumen persistente)
+#   2. Necesidad Sucursales/ si existe (desarrollo local)
+#   3. data/ junto al codigo (PythonAnywhere/cloud)
+_ENV_DATA_DIR = os.environ.get('PEDIDOS_DATA_DIR', '')
 _NEC_DIR = os.path.join(os.path.dirname(BASE_DIR), 'Necesidad Sucursales')
-if os.path.isdir(_NEC_DIR):
+if not _ENV_DATA_DIR and os.path.isdir(_NEC_DIR):
     DATA_DIR          = _NEC_DIR
     PRESUPUESTO_CSV   = os.path.join(DATA_DIR, 'Presupuesto 08-06-26.csv')
     LISTADO_STOCK_CSV = os.path.join(DATA_DIR, 'Listado de Stock 6-4.csv')
@@ -26,7 +38,7 @@ if os.path.isdir(_NEC_DIR):
     PRECIOS_DDS_XLSX       = os.path.join(DATA_DIR, 'precios DDS.xlsx')
     PRECIOS_SUIZO_CMP_XLSX = os.path.join(DATA_DIR, 'precios Suizo cmp.xlsx')
 else:
-    DATA_DIR          = os.path.join(BASE_DIR, 'data')
+    DATA_DIR          = _ENV_DATA_DIR or os.path.join(BASE_DIR, 'data')
     os.makedirs(DATA_DIR, exist_ok=True)
     PRESUPUESTO_CSV   = os.path.join(DATA_DIR, 'presupuesto.csv')
     LISTADO_STOCK_CSV = os.path.join(DATA_DIR, 'listado_stock.csv')
