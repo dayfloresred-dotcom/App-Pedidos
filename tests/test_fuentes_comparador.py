@@ -32,3 +32,14 @@ def test_stale_si_todo_viejo():
 def test_vacio():
     r = transformar([], datetime(2026, 7, 3, 12))
     assert r['precios'] == {} and r['mas_reciente'] is None and r['stale'] is True
+
+
+def test_transformar_con_datetimes_aware():
+    from datetime import timezone
+    ahora = datetime(2026, 7, 3, 12, tzinfo=timezone.utc)
+    rows = [{'sku': '1', 'drogueria': 'DDS', 'precio': 10.0,
+             'cod_alfabeta': None,
+             'consultado_at': datetime(2026, 7, 3, 10, tzinfo=timezone.utc)}]
+    r = transformar(rows, ahora)
+    assert r['precios']['1']['SUD'] == 10.0
+    assert r['stale'] is False

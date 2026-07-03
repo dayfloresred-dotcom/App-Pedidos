@@ -1,6 +1,6 @@
 """Conector read-only al Postgres del comparador (precios SUD/SUIZO).
 En el VPS viaja por la red interna de Docker (host `postgres`)."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from config import COMPARADOR_DB_URL
 
@@ -60,4 +60,6 @@ def cargar():
             rows = cur.fetchall()
     finally:
         conn.close()
-    return transformar(rows, datetime.now())
+    # consultado_at llega timezone-aware desde Postgres (timestamptz):
+    # comparar contra un ahora igualmente aware.
+    return transformar(rows, datetime.now(timezone.utc))
