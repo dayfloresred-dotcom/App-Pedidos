@@ -17,4 +17,10 @@ def test_config_fuentes_defaults_y_env(monkeypatch):
     monkeypatch.setenv('PLEX_DB', 'onze_center')
     importlib.reload(config)
     assert config.fuente_mysql_configurada(config.PLEX) is True
-    importlib.reload(config)  # dejar config coherente para el resto de la suite
+    # limpiar env ANTES del reload final, para dejar config con defaults reales
+    for var in ['PLEX_HOST', 'PLEX_PORT', 'PLEX_USER', 'PLEX_PASSWORD', 'PLEX_DB',
+                'VENTAS_VENTANA_DIAS']:
+        monkeypatch.delenv(var, raising=False)
+    importlib.reload(config)
+    assert config.PLEX['host'] == ''  # config quedó con defaults, sin valores de test
+    assert config.VENTAS_VENTANA_DIAS == 60
