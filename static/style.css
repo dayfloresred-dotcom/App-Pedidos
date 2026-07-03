@@ -1,13 +1,191 @@
-body { font-size: 14px; }
-.navbar-brand { font-weight: 600; }
-.table th { background: #f8f9fa; font-size: 12px; }
-.table td { font-size: 13px; vertical-align: middle; }
-.qty-input { width: 70px; text-align: center; }
-.badge-sud { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
-.badge-suizo { background: #ede9fe; color: #5b21b6; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
-.badge-pendiente { background: #fef3c7; color: #92400e; padding: 3px 9px; border-radius: 10px; }
-.badge-comprado  { background: #dcfce7; color: #166534; padding: 3px 9px; border-radius: 10px; }
-.badge-cancelado { background: #fee2e2; color: #991b1b; padding: 3px 9px; border-radius: 10px; }
-.chip-suc { background: #e8f4ec; color: #2a7a3b; font-size: 11px; padding: 2px 7px; border-radius: 10px; margin: 1px; display: inline-block; }
-.sol-number { color: #0d6efd; font-weight: 600; }
-.filter-bar { background: #f8f9fa; padding: 12px; margin-bottom: 16px; border-radius: 8px; }
+/* ============================================================
+   App-Pedidos — Sistema de diseño (terracota refinada)
+   Todo el color del portal vive acá. Cero hex en templates.
+   ============================================================ */
+:root {
+  --brand: #8E4F44;
+  --brand-hover: #74392F;
+  --brand-tint: #F3E3DE;
+  --fondo: #F6F1EA;
+  --tarjeta: #FFFFFF;
+  --tarjeta-head: #FBF8F3;
+  --borde: #E8DFD3;
+  --texto: #2B2622;
+  --texto-sec: #6E655B;
+  --texto-suave: #8A7E72;
+  --ok-bg: #E3F1E7;      --ok-tx: #20603B;
+  --warn-bg: #FCF3D9;    --warn-tx: #8A6116;
+  --peligro: #A3372B;    --peligro-bg: #FBE9E6;
+  --gen-bg: #FDF0E4;     --gen-tx: #9A4E12;
+  --cd-bg: #E3F1E7;      --cd-tx: #1D6B3E;
+  --sud-bg: #F8EBD4;     --sud-tx: #8A5A12;
+  --suizo-bg: #EFEAFB;   --suizo-tx: #5B34B5;
+  --rot-bg: #E4F0F6;     --rot-tx: #155E75;
+  --radio: 10px;
+}
+
+/* ---------- Base ---------- */
+body {
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+}
+h5 { font-weight: 600; color: var(--texto); }
+
+/* ---------- Navbar ---------- */
+.navbar-app { background: var(--brand); padding: .55rem 1rem; }
+.navbar-app .navbar-brand { color: #fff; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.brand-circle {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; color: var(--brand);
+  font-size: 11px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.brand-sub { opacity: .65; font-weight: 400; }
+.nav-btn {
+  color: #F3DAD3 !important; background: transparent; border: 0;
+  font-size: 13px; padding: .35rem .9rem; border-radius: 99px;
+}
+.nav-btn:hover { color: #fff !important; background: rgba(255,255,255,.12); }
+.nav-btn.active { color: #fff !important; background: rgba(255,255,255,.18); }
+.user-chip {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255,255,255,.22); color: #fff;
+  font-size: 10px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.navbar-app .navbar-toggler { border-color: rgba(255,255,255,.4); }
+.navbar-app .navbar-toggler-icon { filter: invert(1); }
+
+/* ---------- Tarjetas y tablas ---------- */
+.card { border: 1px solid var(--borde); border-radius: var(--radio); background: var(--tarjeta); }
+.card-header { background: var(--tarjeta-head); border-bottom: 1px solid var(--borde); font-weight: 600; }
+.card-footer { background: var(--tarjeta-head); border-top: 1px solid var(--borde); }
+.card-scroll { max-height: 480px; overflow-y: auto; }
+.table { color: var(--texto); }
+.table thead th {
+  background: var(--tarjeta-head); color: var(--texto-suave);
+  font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .4px; border-bottom: 1px solid var(--borde);
+  position: sticky; top: 0; z-index: 1;
+}
+.table td { border-color: #F0EAE0; vertical-align: middle; }
+.table-hover tbody tr:hover { background: #FBF8F3; }
+.fila-activa { background: var(--brand-tint) !important; }
+
+/* Tabla suelta (fuera de .card): la envolvemos en tarjeta */
+.tabla-card { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio); overflow: hidden; }
+.tabla-card .table { margin-bottom: 0; }
+
+/* ---------- Botones ---------- */
+.btn-brand { background: var(--brand); color: #fff; border: 0; }
+.btn-brand:hover, .btn-brand:focus { background: var(--brand-hover); color: #fff; }
+.btn-suave { background: var(--tarjeta); color: var(--texto-sec); border: 1px solid var(--borde); }
+.btn-suave:hover { background: var(--tarjeta-head); color: var(--texto); }
+.btn-peligro { background: var(--peligro); color: #fff; border: 0; }
+.btn-peligro:hover { background: #86281E; color: #fff; }
+
+/* ---------- Badges de estado ---------- */
+.badge-pendiente, .badge-comprado, .badge-cancelado, .badge-generado,
+.badge-estado {
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 99px;
+  display: inline-block; white-space: nowrap;
+}
+.badge-pendiente { background: var(--warn-bg); color: var(--warn-tx); }
+.badge-comprado  { background: var(--ok-bg);   color: var(--ok-tx); }
+.badge-cancelado { background: var(--peligro-bg); color: var(--peligro); }
+.badge-generado  { background: var(--gen-bg);  color: var(--gen-tx); }
+
+/* ---------- Badges de droguería / origen ---------- */
+.badge-cd, .badge-sud, .badge-suizo, .badge-rot {
+  font-size: 10px; font-weight: 600; padding: 2px 9px; border-radius: 99px;
+  display: inline-block; white-space: nowrap;
+}
+.badge-cd    { background: var(--cd-bg);    color: var(--cd-tx); }
+.badge-sud   { background: var(--sud-bg);   color: var(--sud-tx); }
+.badge-suizo { background: var(--suizo-bg); color: var(--suizo-tx); }
+.badge-rot   { background: var(--rot-bg);   color: var(--rot-tx); }
+
+/* Cabeceras de tarjeta por droguería (Generar orden) */
+.head-cd    { background: var(--cd-bg) !important; }    .head-cd .drog-nombre { color: var(--cd-tx); }
+.head-sud   { background: var(--sud-bg) !important; }   .head-sud .drog-nombre { color: var(--sud-tx); }
+.head-suizo { background: var(--suizo-bg) !important; } .head-suizo .drog-nombre { color: var(--suizo-tx); }
+.head-sinprecio { background: var(--peligro-bg) !important; } .head-sinprecio .drog-nombre { color: var(--peligro); }
+.drog-nombre { font-weight: 700; }
+
+/* ---------- Chips y misc ---------- */
+.chip-suc {
+  background: var(--brand-tint); color: var(--brand-hover);
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 99px;
+  display: inline-block; margin: 1px;
+}
+.sol-number { color: var(--brand); font-weight: 600; text-decoration: none; }
+.sol-number:hover { color: var(--brand-hover); text-decoration: underline; }
+.filter-bar {
+  background: var(--tarjeta); border: 1px solid var(--borde);
+  border-radius: var(--radio); padding: .75rem 1rem; margin-bottom: 1rem;
+}
+.excedente-tag { background: var(--rot-bg); color: var(--rot-tx); font-size: 10px; padding: 1px 6px; border-radius: 8px; }
+
+/* Pills de detalle por sucursal (Generar orden) */
+.pill-suc {
+  background: var(--tarjeta); border: 1px solid var(--borde);
+  border-radius: 8px; padding: .35rem .6rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.detalle-row-bg { background: var(--tarjeta-head); }
+
+/* ---------- Formularios ---------- */
+.form-control, .form-select { border-color: var(--borde); color: var(--texto); }
+.form-control:focus, .form-select:focus {
+  border-color: var(--brand); box-shadow: 0 0 0 .2rem rgba(142, 79, 68, .15);
+}
+.qty-input, .env-input { min-height: 34px; }
+@media (pointer: coarse) { .qty-input, .env-input { min-height: 42px; } }
+
+/* ---------- Metric cards (confirmado / consolidado) ---------- */
+.metric-card {
+  background: var(--tarjeta-head); border: 1px solid var(--borde);
+  border-radius: var(--radio); padding: .9rem 1rem;
+}
+.metric-card .metric-label { font-size: 12px; color: var(--texto-suave); }
+.metric-card .metric-valor { font-size: 20px; font-weight: 600; }
+
+/* ---------- Toasts ---------- */
+#toast-wrap {
+  position: fixed; right: 16px; bottom: 16px; z-index: 2000;
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+}
+.toast-app {
+  background: var(--texto); color: #fff; font-size: 13px;
+  padding: .6rem .9rem; border-radius: 8px;
+  display: flex; align-items: center; gap: 8px;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity .25s ease, transform .25s ease;
+  max-width: 360px;
+}
+.toast-app.show { opacity: 1; transform: none; }
+.toast-app .toast-ic { font-weight: 700; }
+.toast-exito .toast-ic { color: #7BC495; }
+.toast-error .toast-ic { color: #F09A8D; }
+.toast-info  .toast-ic { color: #9CC4DB; }
+
+/* ---------- Modal de confirmación ---------- */
+.conf-titulo { font-weight: 600; margin-bottom: .35rem; }
+.conf-msg { color: var(--texto-sec); font-size: 13.5px; }
+
+/* ---------- Login ---------- */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.login-card { width: 100%; max-width: 380px; padding: 2rem; }
+.login-brand { display: flex; flex-direction: column; align-items: center; gap: .5rem; margin-bottom: 1.25rem; }
+.login-brand .brand-circle { width: 44px; height: 44px; font-size: 16px; background: var(--brand); color: #fff; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 575.98px) {
+  .tabla-card, .card-scroll { overflow-x: auto; }
+  .table { min-width: 560px; }
+  .filter-bar .row > .col-auto { width: 100%; }
+  .filter-bar .form-control, .filter-bar .form-select { width: 100% !important; }
+  .botonera-movil { display: flex; flex-direction: column; gap: .5rem; align-items: stretch !important; }
+}
