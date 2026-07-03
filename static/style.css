@@ -127,6 +127,7 @@ h5 { font-weight: 600; color: var(--texto); }
   border-radius: var(--radio); padding: .75rem 1rem; margin-bottom: 1rem;
 }
 .excedente-tag { background: var(--rot-bg); color: var(--rot-tx); font-size: 10px; padding: 1px 6px; border-radius: 8px; }
+.total-enviado { color: var(--rot-tx); font-weight: 600; }
 
 /* Pills de detalle por sucursal (Generar orden) */
 .pill-suc {

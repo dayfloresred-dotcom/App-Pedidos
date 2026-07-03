@@ -17,7 +17,7 @@
       <td class="text-center">
         {% set env = envios.get(it.sku, {}) %}
         {% if env %}
-          <span class="fw-bold" style="color:#075985">{{ env.values()|sum }}</span>
+          <span class="total-enviado">{{ env.values()|sum }}</span>
           <div class="small text-muted">{% for code, cc in env.items() %}{{ cc }} {{ ENVLBL.get(code, code) }}{% if not loop.last %} + {% endif %}{% endfor %}</div>
         {% else %}
           <span class="text-muted small">—</span>
