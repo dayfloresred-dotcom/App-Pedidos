@@ -1,6 +1,10 @@
 """Aceptación: compara el catálogo por FUENTES vs el catálogo por ARCHIVOS.
 Uso: docker compose -f docker-compose.prod.yml exec pedidos python scripts/comparar_catalogos.py"""
+import os
 import random
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import data_loader
 import fuentes
