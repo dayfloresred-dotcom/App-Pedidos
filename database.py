@@ -71,6 +71,12 @@ def init_db():
             UNIQUE(sucursal, sku, drogueria)
         )
     ''')
+    # Índices: aceleran get_consolidado / get_items_detalle / get_envios,
+    # que se ejecutan por producto en cada render de Generar orden.
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_sku ON items_solicitud(sku)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_solicitud ON items_solicitud(solicitud_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_envios_suc_sku ON envios(sucursal, sku)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_omitidos_suc_sku ON omitidos(sucursal, sku)")
     conn.commit()
     conn.close()
 
