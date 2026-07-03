@@ -1,6 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
-<h5 class="mb-1">Actualizar archivos de datos</h5>
+<h5 class="mb-3">Actualizar datos</h5>
+
+<h5 class="mb-3">Fuentes automáticas</h5>
+<div class="row g-3 mb-3">
+  {% set NOMBRES = {'plex': 'Plex ERP (catálogo, ventas, stock)',
+                    'comparador': 'Comparador (precios SUD/SUIZO)',
+                    'quantio': 'Quantio CD (stock depósito)'} %}
+  {% set estados = {} %}
+  {% for e in fuentes_estado %}{% set _ = estados.update({e.fuente: e}) %}{% endfor %}
+  {% for clave, nombre in NOMBRES.items() %}
+  {% set e = estados.get(clave) %}
+  <div class="col-md-4">
+    <div class="metric-card h-100">
+      <div class="metric-label">{{ nombre }}</div>
+      <div class="d-flex align-items-center gap-2 mt-1">
+        {% if e and not e.error %}
+          <span class="badge-comprado">OK</span>
+        {% elif e and e.ultima_ok %}
+          <span class="badge-pendiente">Con aviso</span>
+        {% else %}
+          <span class="badge-cancelado">Sin datos</span>
+        {% endif %}
+        <span class="small text-muted">{{ e.filas if e else 0 }} filas</span>
+      </div>
+      <div class="small text-muted mt-1">Última OK: {{ e.ultima_ok if e and e.ultima_ok else '—' }}</div>
+      {% if e and e.error %}<div class="small" style="color: var(--peligro)">{{ e.error[:120] }}</div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<div class="d-flex gap-2 flex-wrap align-items-center mb-4">
+  <button class="btn btn-sm btn-brand" onclick="refrescarFuentes(this)">Actualizar ahora</button>
+  {% if n_no_matcheados %}
+  <span class="badge-pendiente">{{ n_no_matcheados }} productos del CD sin matchear</span>
+  <a class="btn btn-sm btn-suave" href="{{ url_for('fuentes_no_matcheados_csv') }}">↓ Descargar CSV</a>
+  {% endif %}
+  <form method="post" action="{{ url_for('fuentes_subir_mapeos') }}" enctype="multipart/form-data"
+        class="d-flex gap-2 align-items-center">
+    <input type="file" name="archivo" accept=".csv" class="form-control form-control-sm" style="width:230px">
+    <button type="submit" class="btn btn-sm btn-suave">Subir mapeos CD</button>
+  </form>
+</div>
+
+<h5 class="mb-3">Fallback manual</h5>
 <p class="text-muted small mb-3">Subí los archivos nuevos. Solo los archivos que selecciones se actualizan — el resto queda igual.</p>
 
 <form method="post" enctype="multipart/form-data">
@@ -49,4 +92,26 @@
     </div>
   </div>
 </form>
+
+{% block scripts %}
+<script>
+async function refrescarFuentes(btn) {
+  setLoading(btn, true);
+  try {
+    const res = await fetch('/api/fuentes/refrescar', {method: 'POST'});
+    const d = await res.json().catch(() => ({}));
+    if (res.ok && d.ok) {
+      toast(`Catálogo actualizado — ${d.productos} productos`, 'exito');
+      setTimeout(() => location.reload(), 900);
+      return;
+    }
+    toast(d.error || 'El refresco falló — revisá el estado de las fuentes', 'error');
+    setTimeout(() => location.reload(), 1500);
+  } catch (e) {
+    toast('Error de conexión', 'error');
+    setLoading(btn, false);
+  }
+}
+</script>
+{% endblock %}
 {% endblock %}
