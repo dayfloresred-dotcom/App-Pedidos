@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height:70vh">
-  <div class="card shadow-sm" style="width:320px">
-    <div class="card-body p-4">
-      <h5 class="text-center mb-4">Iniciar sesión</h5>
-      <form method="post">
-        <div class="mb-3">
-          <label class="form-label small">Sucursal / Usuario</label>
-          <input type="text" name="username" class="form-control" required autofocus>
-        </div>
-        <div class="mb-3">
-          <label class="form-label small">Contraseña</label>
-          <input type="password" name="password" class="form-control" required>
-        </div>
-        {% if error %}
-          <div class="alert alert-danger small py-2">{{ error }}</div>
-        {% endif %}
-        <button type="submit" class="btn w-100 text-white" style="background:#111">Ingresar</button>
-      </form>
+<div class="login-wrap">
+  <div class="card login-card">
+    <div class="login-brand">
+      <span class="brand-circle">FR</span>
+      <div class="fw-bold">Farmacias Red</div>
+      <div class="text-muted small">Portal de pedidos de refuerzo</div>
     </div>
+    {% if error %}<div class="alert alert-danger py-2 small">{{ error }}</div>{% endif %}
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label small fw-bold">Sucursal / usuario</label>
+        <input type="text" name="username" class="form-control" required autofocus>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-bold">Contraseña</label>
+        <input type="password" name="password" class="form-control" required>
+      </div>
+      <button type="submit" class="btn btn-brand w-100">Ingresar</button>
+    </form>
   </div>
 </div>
 {% endblock %}
