@@ -15,6 +15,10 @@ from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
 from export_service import generar_suizo, generar_sud, generar_quantio
+from config import FUENTES_CRON_TOKEN
+from database import get_fuentes_estado, agregar_mapeos_cd
+from fuentes import refrescar_fuentes, NO_MATCH_JSON
+import fuentes as fuentes_mod
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -644,7 +648,74 @@ def actualizar_datos():
         else:
             info = {'existe': False, 'fecha': '—'}
         archivos_info[field] = {**cfg, **info, 'nombre': os.path.basename(path)}
-    return render_template('actualizar_datos.html', archivos=archivos_info)
+
+    import json as json_mod
+    ruta_nm = os.path.join(fuentes_mod._DIR_MEMORIA, NO_MATCH_JSON)
+    n_no_match = 0
+    if os.path.exists(ruta_nm):
+        try:
+            with open(ruta_nm, encoding='utf-8') as fnm:
+                n_no_match = len(json_mod.load(fnm))
+        except (OSError, ValueError):
+            n_no_match = 0
+
+    return render_template('actualizar_datos.html', archivos=archivos_info,
+        fuentes_estado=get_fuentes_estado(), n_no_matcheados=n_no_match)
+
+
+@app.route('/api/fuentes/refrescar', methods=['POST'])
+def api_refrescar_fuentes():
+    token = request.headers.get('X-Cron-Token', '')
+    autorizado_cron = bool(FUENTES_CRON_TOKEN) and token == FUENTES_CRON_TOKEN
+    if not autorizado_cron and session.get('rol') != 'admin':
+        return jsonify({'error': 'Sin permiso'}), 403
+    resumen = refrescar_fuentes()
+    return jsonify(resumen), (200 if resumen['ok'] else 502)
+
+
+@app.route('/fuentes/no-matcheados.csv')
+@login_required
+@admin_required
+def fuentes_no_matcheados_csv():
+    import csv as csv_mod
+    import io as io_mod
+    ruta = os.path.join(fuentes_mod._DIR_MEMORIA, NO_MATCH_JSON)
+    filas = []
+    if os.path.exists(ruta):
+        import json as json_mod
+        with open(ruta, encoding='utf-8') as f:
+            filas = json_mod.load(f)
+    buf = io_mod.StringIO()
+    w = csv_mod.writer(buf)
+    w.writerow(['codigo_quantio', 'ean', 'troquel', 'cantidad', 'sku'])
+    for fila in filas:
+        w.writerow([fila.get('codigo', ''), fila.get('ean', ''),
+                    fila.get('troquel', ''), fila.get('cantidad', ''), ''])
+    return Response(buf.getvalue().encode('utf-8-sig'), mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename="cd_no_matcheados.csv"'})
+
+
+@app.route('/fuentes/mapeos', methods=['POST'])
+@login_required
+@admin_required
+def fuentes_subir_mapeos():
+    import csv as csv_mod
+    import io as io_mod
+    f = request.files.get('archivo')
+    if not f or not f.filename:
+        flash('No seleccionaste ningún archivo de mapeos.', 'warning')
+        return redirect(url_for('actualizar_datos'))
+    contenido = f.read().decode('utf-8-sig', errors='replace')
+    pares = []
+    for fila in csv_mod.DictReader(io_mod.StringIO(contenido)):
+        codigo = (fila.get('codigo_quantio') or '').strip()
+        sku = (fila.get('sku') or '').strip()
+        if codigo and sku:
+            pares.append((codigo, sku))
+    n = agregar_mapeos_cd(pares)
+    flash(f'{n} mapeos de CD cargados.', 'success')
+    return redirect(url_for('actualizar_datos'))
+
 
 @app.errorhandler(403)
 def forbidden(e):
