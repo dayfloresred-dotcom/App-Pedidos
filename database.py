@@ -71,6 +71,21 @@ def init_db():
             UNIQUE(sucursal, sku, drogueria)
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS fuentes_estado (
+            fuente      TEXT PRIMARY KEY,
+            ultima_ok   TEXT,
+            filas       INTEGER NOT NULL DEFAULT 0,
+            error       TEXT,
+            actualizado TEXT
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS mapeo_cd (
+            codigo_quantio TEXT PRIMARY KEY,
+            sku            TEXT NOT NULL
+        )
+    ''')
     # Índices: aceleran get_consolidado / get_items_detalle / get_envios,
     # que se ejecutan por producto en cada render de Generar orden.
     conn.execute("CREATE INDEX IF NOT EXISTS idx_items_sku ON items_solicitud(sku)")
@@ -491,3 +506,50 @@ def cancelar_solicitud(sol_id):
     )
     conn.commit()
     conn.close()
+
+
+def set_fuente_estado(fuente, ok, filas, error):
+    conn = get_db()
+    ahora = now_local().strftime('%d/%m/%Y %H:%M')
+    if ok:
+        conn.execute('''INSERT INTO fuentes_estado (fuente, ultima_ok, filas, error, actualizado)
+            VALUES (?,?,?,NULL,?)
+            ON CONFLICT(fuente) DO UPDATE SET ultima_ok=excluded.ultima_ok,
+                filas=excluded.filas, error=NULL, actualizado=excluded.actualizado''',
+            (fuente, ahora, filas, ahora))
+    else:
+        conn.execute('''INSERT INTO fuentes_estado (fuente, filas, error, actualizado)
+            VALUES (?,?,?,?)
+            ON CONFLICT(fuente) DO UPDATE SET error=excluded.error,
+                actualizado=excluded.actualizado''',
+            (fuente, filas, error or 'error desconocido', ahora))
+    conn.commit()
+    conn.close()
+
+
+def get_fuentes_estado():
+    conn = get_db()
+    rows = conn.execute('SELECT * FROM fuentes_estado ORDER BY fuente').fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_mapeo_cd():
+    conn = get_db()
+    rows = conn.execute('SELECT codigo_quantio, sku FROM mapeo_cd').fetchall()
+    conn.close()
+    return {r['codigo_quantio']: r['sku'] for r in rows}
+
+
+def agregar_mapeos_cd(pares):
+    conn = get_db()
+    n = 0
+    for codigo, sku in pares:
+        codigo, sku = str(codigo).strip(), str(sku).strip()
+        if codigo and sku:
+            conn.execute('''INSERT INTO mapeo_cd (codigo_quantio, sku) VALUES (?,?)
+                ON CONFLICT(codigo_quantio) DO UPDATE SET sku=excluded.sku''', (codigo, sku))
+            n += 1
+    conn.commit()
+    conn.close()
+    return n
