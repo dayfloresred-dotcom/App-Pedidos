@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-md-8">
+  <div class="col-12">
     <div class="alert alert-success d-flex align-items-center gap-3 mb-4">
       <span style="font-size:2rem">✓</span>
       <div>
@@ -31,6 +31,7 @@
     </div>
     {% set ORIGEN = {'CD':'Centro de Distribución','SUD':'Droguería Sud','SUIZO':'Droguería Suizo','ROT':'Rotación','INEXISTENTE':'Producto inexistente'} %}
     {% set ENVLBL = {'CD':'CD','SUD':'Sud','SUIZO':'Suizo','ROT':'Rotación'} %}
+    <div class="table-responsive">
     <table class="table table-sm">
       <thead><tr>
         <th>EAN</th><th>Producto</th><th>Laboratorio</th>
@@ -88,6 +89,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     <div class="d-flex justify-content-between mt-3">
       <div>
         {% if sol.estado == 'pendiente' %}
