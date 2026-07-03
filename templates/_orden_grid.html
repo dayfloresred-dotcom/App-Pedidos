@@ -5,12 +5,11 @@
   {% for drog, items in orden.items() %}
   <div class="col-md-6">
     <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center"
-           style="background:{% if drog == 'SUD' %}#fef9ec{% elif drog == 'SUIZO' %}#f5f0ff{% elif drog == 'DROGUERIA RED' %}#e8f4ec{% else %}#f5f5f5{% endif %}">
-        <span class="fw-bold" style="color:{% if drog == 'SUD' %}#92400e{% elif drog == 'SUIZO' %}#5b21b6{% elif drog == 'DROGUERIA RED' %}#166534{% else %}#555{% endif %}">{{ drog }}</span>
+      <div class="card-header d-flex justify-content-between align-items-center head-{{ 'sud' if drog == 'SUD' else 'suizo' if drog == 'SUIZO' else 'cd' if drog == 'DROGUERIA RED' else 'sinprecio' }}">
+        <span class="drog-nombre">{{ drog }}</span>
         <span class="small text-muted">{{ items|length }} productos · {{ items|sum(attribute='total') }} u.</span>
       </div>
-      <div class="card-body p-0" style="max-height:480px;overflow-y:auto">
+      <div class="card-body p-0 card-scroll">
         {% set ncols = 7 if drog == 'DROGUERIA RED' else 5 %}
         <table class="table table-sm mb-0">
           <thead><tr>
@@ -30,7 +29,7 @@
                   onclick="toggleDet('{{ rid }}', this)">&#9656;</button>
                 {% endif %}
                 {{ it.descripcion[:32] }}
-                {% if it.es_overflow %}<span class="ms-1" style="background:#e0f2fe;color:#075985;font-size:10px;padding:1px 6px;border-radius:8px">excedente CD</span>{% endif %}
+                {% if it.es_overflow %}<span class="ms-1 excedente-tag">excedente CD</span>{% endif %}
 
               </td>
               <td>{{ it.sucursales_str|safe }}</td>
@@ -61,12 +60,12 @@
             </tr>
             {% if tot > 0 %}
             <tr class="detalle-{{ rid }}" style="display:none">
-              <td colspan="{{ ncols }}" style="background:#f6fbf8">
+              <td colspan="{{ ncols }}" class="detalle-row-bg">
                 <div class="px-2 py-2">
                   <div class="small text-muted mb-2">Cantidad a enviar de cada sucursal desde <b>{{ it.drog_code }}</b>{% if drog == 'DROGUERIA RED' %} (esta cantidad es tambi&eacute;n la del archivo Quantio){% endif %}. La &times; cancela ese producto para esa sucursal:</div>
                   <div class="d-flex flex-wrap gap-2">
                     {% for d in it.detalle_suc %}
-                    <div class="d-flex align-items-center gap-2 border rounded px-2 py-1" style="background:#fff">
+                    <div class="d-flex align-items-center gap-2 pill-suc">
                       <span class="small fw-bold">{{ d.sucursal }}</span>
                       <span class="small text-muted">de {{ d.cantidad }}</span>
                       {% if it.drog_code %}
@@ -94,13 +93,12 @@
       </div>
       <div class="card-footer">
         {% if drog == 'SIN_PRECIO' %}
-        <button class="btn btn-sm w-100 text-white" style="background:#991b1b"
+        <button class="btn btn-sm w-100 btn-peligro"
           onclick="marcarInexistente()">
           ✕ Marcar como producto inexistente
         </button>
         {% else %}
-        <button class="btn btn-sm w-100 text-white"
-          style="background:{% if drog == 'SUD' %}#92400e{% elif drog == 'SUIZO' %}#5b21b6{% elif drog == 'DROGUERIA RED' %}#166534{% else %}#555{% endif %}"
+        <button class="btn btn-sm w-100 btn-brand"
           onclick="marcarComprado('{{ drog }}')">
           ✓ Marcar {{ drog }} como comprado
         </button>

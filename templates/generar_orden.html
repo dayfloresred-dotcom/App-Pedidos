@@ -17,14 +17,14 @@
     <select id="export-suc" class="form-select form-select-sm" style="width:auto">
       {% for s in sucs_orden %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
     </select>
-    <button class="btn btn-sm text-white" style="background:#166534"
+    <button class="btn btn-sm btn-suave"
       onclick="exportPedido('CD')">↓ Quantio (CD)</button>
-    <button class="btn btn-sm text-white" style="background:#92400e"
+    <button class="btn btn-sm btn-suave"
       onclick="exportPedido('SUD')">↓ SUD (.dds)</button>
-    <button class="btn btn-sm text-white" style="background:#5b21b6"
+    <button class="btn btn-sm btn-suave"
       onclick="exportPedido('SUIZO')">↓ SUIZO (.arg)</button>
     {% endif %}
-    <a class="btn btn-sm text-white" style="background:#0f766e" href="/reporte/rotacion.xlsx">↓ Rotación (.xlsx)</a>
+    <a class="btn btn-sm btn-suave" href="/reporte/rotacion.xlsx">↓ Rotación (.xlsx)</a>
   </div>
 </div>
 <div id="orden-grid">
@@ -33,12 +33,42 @@
 {% endblock %}
 {% block scripts %}
 <script>
-function toggleDet(sku, btn) {
-  const row = document.querySelector('.detalle-' + CSS.escape(sku));
+function toggleDet(rid, btn) {
+  const row = document.querySelector('.detalle-' + CSS.escape(rid));
   if (!row) return;
   const show = row.style.display === 'none';
   row.style.display = show ? '' : 'none';
-  btn.textContent = show ? '▾' : '▸';
+  if (btn) btn.textContent = show ? '▾' : '▸';
+}
+
+function filtroActual() {
+  return new URLSearchParams(location.search).get('suc') || '';
+}
+
+async function refrescarOrden() {
+  const grid = document.getElementById('orden-grid');
+  const abiertos = [...grid.querySelectorAll('tr[class*="detalle-"]')]
+    .filter(r => r.style.display !== 'none')
+    .map(r => [...r.classList].find(c => c.startsWith('detalle-')));
+  const scrolls = [...grid.querySelectorAll('.card-scroll')].map(b => b.scrollTop);
+  const scrollY = window.scrollY;
+
+  const res = await fetch('/generar-orden/fragmento?suc=' + encodeURIComponent(filtroActual()));
+  if (!res.ok) { toast('No se pudo refrescar la orden', 'error'); return; }
+  grid.innerHTML = await res.text();
+
+  abiertos.forEach(cl => {
+    const row = grid.querySelector('.' + CSS.escape(cl));
+    if (!row) return;
+    row.style.display = '';
+    const rid = cl.replace('detalle-', '');
+    const btn = grid.querySelector(`button[onclick*="${rid}"]`);
+    if (btn) btn.textContent = '▾';
+  });
+  [...grid.querySelectorAll('.card-scroll')].forEach((b, i) => {
+    if (scrolls[i] !== undefined) b.scrollTop = scrolls[i];
+  });
+  window.scrollTo(0, scrollY);
 }
 
 async function descargar(url, payload, fallbackName) {
@@ -50,7 +80,7 @@ async function descargar(url, payload, fallbackName) {
   if (!res.ok) {
     let msg = 'No se pudo generar el archivo.';
     try { const e = await res.json(); if (e.error) msg = e.error; } catch (_) {}
-    alert(msg);
+    toast(msg, 'error');
     return;
   }
   const cd = res.headers.get('Content-Disposition') || '';
@@ -68,39 +98,52 @@ async function descargar(url, payload, fallbackName) {
 
 function exportPedido(code) {
   const sel = document.getElementById('export-suc');
-  if (!sel || !sel.value) { alert('Elegí una sucursal'); return; }
-  const suc = sel.value;
+  if (!sel || !sel.value) { toast('Elegí una sucursal', 'error'); return; }
   const url = code === 'CD' ? '/exportar-quantio' : '/exportar/' + code;
-  descargar(url, {sucursal: suc}, 'pedido_' + code.toLowerCase());
+  descargar(url, {sucursal: sel.value}, 'pedido_' + code.toLowerCase());
 }
 
 async function enviarItem(sku, suc, code, btn) {
   const pill = btn.closest('div');
   const inp  = pill.querySelector('.env-input');
   const cant = parseInt(inp.value, 10) || 0;
-  if (cant <= 0) { alert('Poné una cantidad mayor a 0'); return; }
-  btn.disabled = true;
+  if (cant <= 0) { toast('Poné una cantidad mayor a 0', 'error'); return; }
+  setLoading(btn, true);
   const res = await fetch('/api/orden/enviar', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({sku, sucursal: suc, drogueria: code, cantidad: cant})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else { btn.disabled = false; alert(d.error || 'No se pudo enviar.'); }
+  if (res.ok && d.ok) {
+    toast(`Envío registrado — ${suc} · ${cant} u. desde ${code}`, 'exito');
+    await refrescarOrden();
+  } else {
+    setLoading(btn, false);
+    toast(d.error || 'No se pudo registrar el envío', 'error');
+  }
 }
 
 async function rotacionItem(sku, suc, btn) {
   const pill = btn.closest('div');
   const inp  = pill.querySelector('.env-input');
   const cant = parseInt(inp.value, 10) || 0;
-  if (cant <= 0) { alert('Poné una cantidad mayor a 0'); return; }
-  if (!confirm('¿Cubrir ' + cant + ' u. de ' + suc + ' por ROTACIÓN (stock interno)?')) return;
-  btn.disabled = true;
+  if (cant <= 0) { toast('Poné una cantidad mayor a 0', 'error'); return; }
+  const ok = await confirmar(`Se cubren ${cant} u. de ${suc} con stock interno (rotación).`,
+    {titulo: '¿Cubrir por rotación?', accion: 'Cubrir por rotación', peligro: false});
+  if (!ok) return;
+  setLoading(btn, true);
   const res = await fetch('/api/orden/rotacion', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({sku, sucursal: suc, cantidad: cant})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else { btn.disabled = false; alert(d.error || 'No se pudo.'); }
+  if (res.ok && d.ok) {
+    toast(`Rotación registrada — ${suc} · ${cant} u.`, 'exito');
+    await refrescarOrden();
+  } else {
+    setLoading(btn, false);
+    toast(d.error || 'No se pudo registrar la rotación', 'error');
+  }
 }
 
 async function omitirItem(sku, suc, code) {
@@ -109,44 +152,56 @@ async function omitirItem(sku, suc, code) {
     body: JSON.stringify({sku, sucursal: suc, drogueria: code})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo.');
+  if (res.ok && d.ok) { toast('Quitado de esta droguería', 'exito'); refrescarOrden(); }
+  else toast(d.error || 'No se pudo quitar', 'error');
 }
 
 async function omitirProducto(sku, code) {
-  if (!confirm('¿Quitar este producto de esta droguería (todas las sucursales)?')) return;
+  const ok = await confirmar('Se quita para todas las sucursales de esta tarjeta.',
+    {titulo: '¿Quitar el producto de esta droguería?', accion: 'Quitar'});
+  if (!ok) return;
   const res = await fetch('/api/orden/omitir-producto', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({sku, drogueria: code})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo.');
+  if (res.ok && d.ok) { toast('Producto quitado de la droguería', 'exito'); refrescarOrden(); }
+  else toast(d.error || 'No se pudo quitar', 'error');
 }
 
 async function marcarComprado(drog) {
+  const ok = await confirmar('Los productos pendientes de esta droguería pasan a comprados y salen de la orden.',
+    {titulo: `¿Marcar ${drog} como comprado?`, accion: 'Marcar comprado', peligro: false});
+  if (!ok) return;
   const hoy = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
   const res = await fetch('/api/orden/comprado', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({drogueria: drog, fecha: hoy})
   });
-  const d = await res.json();
-  if (d.ok) {
-    alert(`✓ ${drog}: ${d.n} producto(s) marcados como comprados y quitados de la orden.`);
-    location.reload();
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) {
+    toast(`${drog}: ${d.n} producto(s) marcados como comprados`, 'exito');
+    refrescarOrden();
+  } else {
+    toast(d.error || 'No se pudo marcar', 'error');
   }
 }
 
 async function marcarInexistente() {
   const skus = [];
   document.querySelectorAll('.qty-input[data-drog="SIN_PRECIO"]').forEach(inp => skus.push(inp.dataset.sku));
-  if (!skus.length) { alert('No hay productos sin precio'); return; }
-  if (!confirm('¿Marcar estos productos como INEXISTENTES?\nAparecerán como Cancelado / "Producto inexistente" en los pedidos.')) return;
+  if (!skus.length) { toast('No hay productos sin precio', 'info'); return; }
+  const ok = await confirmar('Aparecerán como cancelados con origen "Producto inexistente".',
+    {titulo: `¿Marcar ${skus.length} producto(s) como inexistentes?`, accion: 'Marcar inexistentes'});
+  if (!ok) return;
   const res = await fetch('/api/orden/inexistente', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({skus})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo.');
+  if (res.ok && d.ok) { toast('Marcados como inexistentes', 'exito'); refrescarOrden(); }
+  else toast(d.error || 'No se pudo marcar', 'error');
 }
 </script>
 {% endblock %}
