@@ -18,6 +18,7 @@ def _conn():
         host=CD_MYSQL['host'], port=CD_MYSQL['port'], user=CD_MYSQL['user'],
         password=CD_MYSQL['password'], database=CD_MYSQL['db'],
         connect_timeout=10, read_timeout=60,
+        charset='utf8',
         cursorclass=pymysql.cursors.DictCursor)
 
 

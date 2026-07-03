@@ -14,6 +14,7 @@ conn = pymysql.connect(
     host=os.environ['CD_HOST'], port=int(os.environ.get('CD_PORT') or 3306),
     user=os.environ['CD_USER'], password=os.environ['CD_PASSWORD'],
     database=os.environ['CD_DB'], connect_timeout=10, read_timeout=60,
+    charset='utf8',
     cursorclass=pymysql.cursors.DictCursor)
 
 print(f"# Schema Quantio CD — base `{os.environ['CD_DB']}`\n")

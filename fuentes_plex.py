@@ -71,6 +71,7 @@ def _conn():
         host=PLEX['host'], port=PLEX['port'], user=PLEX['user'],
         password=PLEX['password'], database=PLEX['db'],
         connect_timeout=10, read_timeout=110,
+        charset='utf8',  # el MySQL de Plex no conoce utf8mb4 (mismo charset que el ETL)
         cursorclass=pymysql.cursors.DictCursor)
 
 
