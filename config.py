@@ -67,3 +67,25 @@ from datetime import datetime as _datetime, timezone as _timezone, timedelta as 
 def now_local():
     """Hora local de Argentina (UTC-3, sin horario de verano)."""
     return _datetime.now(_timezone.utc).astimezone(_timezone(_timedelta(hours=-3)))
+
+# ── Fuentes automáticas (todas read-only; ver spec 2026-07-03) ─────────────
+def _mysql_cfg(prefijo):
+    return {
+        'host':     os.environ.get(f'{prefijo}_HOST', ''),
+        'port':     int(os.environ.get(f'{prefijo}_PORT') or 3306),
+        'user':     os.environ.get(f'{prefijo}_USER', ''),
+        'password': os.environ.get(f'{prefijo}_PASSWORD', ''),
+        'db':       os.environ.get(f'{prefijo}_DB', ''),
+    }
+
+PLEX     = _mysql_cfg('PLEX')
+CD_MYSQL = _mysql_cfg('CD')
+
+def fuente_mysql_configurada(cfg):
+    return bool(cfg['host'] and cfg['user'] and cfg['password'] and cfg['db'])
+
+COMPARADOR_DB_URL   = os.environ.get('COMPARADOR_DB_URL', '')
+VENTAS_VENTANA_DIAS = int(os.environ.get('VENTAS_VENTANA_DIAS') or 60)
+FUENTES_RUBROS      = [s.strip() for s in
+                       (os.environ.get('FUENTES_RUBROS') or 'Perfumería,Accesorios').split(',') if s.strip()]
+FUENTES_CRON_TOKEN  = os.environ.get('FUENTES_CRON_TOKEN', '')
