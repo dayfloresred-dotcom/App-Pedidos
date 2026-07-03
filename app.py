@@ -120,11 +120,9 @@ def consolidado():
         n_sucursales=len(suc_set), total_unidades=total_u,
         filtro_lab=lab, filtro_suc=suc, filtro_drog=drog)
 
-@app.route('/generar-orden')
-@login_required
-@admin_required
-def generar_orden():
-    filtro_suc = request.args.get('suc', '')
+def _armar_orden(filtro_suc):
+    """Arma la orden agrupada por droguería. Única fuente de verdad para
+    la página completa y el fragmento (refresco sin reload)."""
     prods    = get_consolidado(sucursal_filtro=filtro_suc or None)
     prod_map = {p['sku']: p for p in load_productos()}
     orden    = {'DROGUERIA RED': [], 'SUD': [], 'SUIZO': [], 'SIN_PRECIO': []}
@@ -136,16 +134,15 @@ def generar_orden():
     conn.close()
 
     def visibles(detalle, sku, code):
-        """Pills que todavía hay que gestionar en la tarjeta de esa droguería."""
         out = []
         for d in detalle:
             env = d['enviado']
             if env.get(code):
-                continue          # ya enviado desde esta droguería
+                continue
             if env.get('ROT'):
-                continue          # cubierto por rotación
+                continue
             if code in omit_map.get((d['sucursal'], sku), set()):
-                continue          # quitado de esta droguería
+                continue
             out.append(d)
         return out
 
@@ -188,7 +185,8 @@ def generar_orden():
                 'detalle_suc': detalle, 'drog_code': ''})
 
     conn = get_db()
-    sucs_set = {r['sucursal'] for r in conn.execute("SELECT DISTINCT sucursal FROM envios WHERE cantidad>0").fetchall()}
+    sucs_set = {r['sucursal'] for r in conn.execute(
+        "SELECT DISTINCT sucursal FROM envios WHERE cantidad>0").fetchall()}
     conn.close()
     for its in orden.values():
         for it in its:
@@ -196,12 +194,31 @@ def generar_orden():
                 sucs_set.add(d['sucursal'])
     sucs_orden = sorted(sucs_set)
 
+    return {k: v for k, v in orden.items() if v}, sucs_orden
+
+
+@app.route('/generar-orden')
+@login_required
+@admin_required
+def generar_orden():
+    filtro_suc = request.args.get('suc', '')
+    orden, sucs_orden = _armar_orden(filtro_suc)
     return render_template('generar_orden.html',
-        orden={k: v for k, v in orden.items() if v},
+        orden=orden,
         sucs_orden=sucs_orden,
         sucursales=SUCURSAL_NAMES,
         filtro_suc=filtro_suc,
         hoy=now_local().strftime('%d/%m/%Y'))
+
+
+@app.route('/generar-orden/fragmento')
+@login_required
+@admin_required
+def generar_orden_fragmento():
+    """Solo la grilla de tarjetas, para refrescar sin recargar la página."""
+    filtro_suc = request.args.get('suc', '')
+    orden, _ = _armar_orden(filtro_suc)
+    return render_template('_orden_grid.html', orden=orden)
 
 # ── API endpoints ──────────────────────────────────────────────────────────
 @app.route('/api/productos')
