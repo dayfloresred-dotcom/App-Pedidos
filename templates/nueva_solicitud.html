@@ -30,10 +30,10 @@
       <input type="text" id="inp-q" class="form-control form-control-sm" placeholder="Nombre o EAN" style="width:240px">
     </div>
     <div class="col-auto">
-      <button class="btn btn-sm text-white" style="background:#111" onclick="buscar()">Buscar</button>
+      <button class="btn btn-sm btn-brand" onclick="buscar()">Buscar</button>
     </div>
     <div class="col-auto ms-auto">
-      <button class="btn btn-sm btn-success" onclick="verSolicitud()">
+      <button class="btn btn-sm btn-brand" onclick="verSolicitud()">
         Ver solicitud (<span id="count-badge">0</span>)
       </button>
     </div>
@@ -41,10 +41,12 @@
 </div>
 
 <div id="tabla-wrap" class="d-none">
+  <div class="tabla-card">
   <table class="table table-sm table-hover">
     <thead><tr><th>SKU</th><th>EAN</th><th>Producto</th><th>Laboratorio</th><th class="text-center">Stock real</th><th class="text-center">Stock CD</th><th class="text-center" style="width:100px">Cantidad</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
+  </div>
   <p class="text-muted small" id="result-count"></p>
 </div>
 
@@ -64,7 +66,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">← Volver a editar</button>
-        <button class="btn btn-sm text-white" style="background:#5a9e6a" onclick="confirmar()">Confirmar solicitud ✓</button>
+        <button class="btn btn-sm btn-brand" onclick="confirmarSolicitud(this)">Confirmar solicitud ✓</button>
       </div>
     </div>
   </div>
@@ -83,10 +85,10 @@ function getSucursal() {
 
 async function buscar() {
   const suc = getSucursal();
-  if (ROL === 'admin' && !suc) { alert('Seleccioná una sucursal primero'); return; }
+  if (ROL === 'admin' && !suc) { toast('Seleccioná una sucursal primero', 'error'); return; }
   const lab = document.getElementById('inp-lab').value;
   const q   = document.getElementById('inp-q').value;
-  if (!lab && !q) { alert('Ingresá laboratorio o nombre de producto'); return; }
+  if (!lab && !q) { toast('Ingresá laboratorio o nombre de producto', 'info'); return; }
   const res  = await fetch(`/api/productos?q=${encodeURIComponent(q)}&lab=${encodeURIComponent(lab)}&suc=${encodeURIComponent(suc)}`);
   const data = await res.json();
   renderTabla(data);
@@ -105,7 +107,7 @@ function renderTabla(prods) {
       <td>${p.descripcion}</td>
       <td>${p.laboratorio}</td>
       <td class="text-center">${p.stock_real ?? 0}</td>
-      <td class="text-center" style="font-weight:600;color:${p.stock_cd==='SI'?'#166534':'#991b1b'}">${p.stock_cd ?? 'NO'}</td>
+      <td class="text-center"><span class="${p.stock_cd==='SI' ? 'badge-cd' : 'badge-cancelado'}">${p.stock_cd ?? 'NO'}</span></td>
       <td class="text-center">
         <input type="number" min="0" class="form-control form-control-sm qty-input"
           value="${val}"
@@ -126,7 +128,7 @@ function updateCarrito(sku, ean, desc, lab, drog, val) {
 
 function verSolicitud() {
   const items = Object.values(carrito);
-  if (!items.length) { alert('No agregaste ningún producto'); return; }
+  if (!items.length) { toast('No agregaste ningún producto', 'info'); return; }
   const tbody = document.getElementById('tbody-revision');
   tbody.innerHTML = items.map(it =>
     `<tr><td class="small text-muted">${it.ean}</td><td>${it.descripcion}</td><td>${it.laboratorio}</td><td class="text-center fw-bold">${it.cantidad}</td></tr>`
@@ -134,18 +136,24 @@ function verSolicitud() {
   new bootstrap.Modal(document.getElementById('modal-revision')).show();
 }
 
-async function confirmar() {
+async function confirmarSolicitud(btn) {
   const suc = getSucursal();
-  if (!suc) { alert('Seleccioná una sucursal'); return; }
+  if (!suc) { toast('Seleccioná una sucursal', 'error'); return; }
   const items = Object.values(carrito);
-  const res = await fetch('/api/solicitud', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({sucursal: suc, items})
-  });
-  const data = await res.json();
-  if (data.sol_id) window.location = `/confirmado/${data.sol_id}`;
-  else alert('Error al guardar: ' + (data.error || 'desconocido'));
+  setLoading(btn, true);
+  try {
+    const res = await fetch('/api/solicitud', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({sucursal: suc, items})
+    });
+    const data = await res.json();
+    if (data.sol_id) { window.location = `/confirmado/${data.sol_id}`; return; }
+    toast('Error al guardar: ' + (data.error || 'desconocido'), 'error');
+  } catch (e) {
+    toast('Error de conexión', 'error');
+  }
+  setLoading(btn, false);
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Enter') buscar(); });
