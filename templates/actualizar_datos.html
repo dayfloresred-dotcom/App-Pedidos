@@ -21,14 +21,14 @@
             <td>
               {{ a.label }}
               {% if a.diario %}
-                <span style="background:#fef9c3;color:#854d0e;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px">diario</span>
+                <span class="badge-pendiente">diario</span>
               {% endif %}
             </td>
             <td class="text-center">
               {% if a.existe %}
-                <span style="color:#166534;font-weight:600">✓ OK</span>
+                <span class="badge-comprado">OK</span>
               {% else %}
-                <span style="color:#991b1b;font-weight:600">✗ Falta</span>
+                <span class="badge-cancelado">Falta</span>
               {% endif %}
             </td>
             <td class="text-muted small">{{ a.fecha }}</td>
@@ -42,8 +42,8 @@
       </table>
     </div>
     <div class="card-footer d-flex gap-2 align-items-center">
-      <button type="submit" class="btn btn-sm text-white" style="background:#111">
-        ↑ Actualizar archivos seleccionados
+      <button type="submit" class="btn btn-sm btn-brand">
+        Actualizar archivos seleccionados
       </button>
       <span class="text-muted small">Los productos se recargan automáticamente al subir.</span>
     </div>

@@ -12,11 +12,12 @@
         {% for s in sucursales %}<option value="{{ s }}" {% if filtro_suc==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-auto"><button class="btn btn-sm btn-secondary">Filtrar</button></div>
+    <div class="col-auto"><button class="btn btn-sm btn-brand">Filtrar</button></div>
     {% if filtro_suc %}<div class="col-auto"><a href="{{ url_for('mis_pedidos') }}" class="btn btn-sm btn-outline-secondary">Limpiar</a></div>{% endif %}
   </form>
 </div>
 {% endif %}
+<div class="tabla-card">
 <table class="table table-sm table-hover">
   <thead><tr>
     <th>N° Pedido</th>
@@ -33,11 +34,11 @@
       <td>{% if s.fecha_compra %}{{ s.fecha_compra }}{% else %}<span class="text-muted fst-italic small">Pendiente…</span>{% endif %}</td>
       <td class="text-center">
         {% if s.estado == 'comprado' %}
-          <span class="badge-comprado">✓ Pedido realizado</span>
+          <span class="badge-comprado">Pedido realizado</span>
         {% elif s.estado == 'cancelado' %}
-          <span class="badge-cancelado">✕ Cancelado</span>
+          <span class="badge-cancelado">Cancelado</span>
         {% else %}
-          <span class="badge-pendiente">⏳ Pendiente</span>
+          <span class="badge-pendiente">Pendiente</span>
         {% endif %}
       </td>
     </tr>
@@ -46,4 +47,5 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endblock %}
