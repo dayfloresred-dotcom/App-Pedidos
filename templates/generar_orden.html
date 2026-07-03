@@ -117,6 +117,7 @@ async function enviarItem(sku, suc, code, btn) {
   if (res.ok && d.ok) {
     toast(`Envío registrado — ${suc} · ${cant} u. desde ${code}`, 'exito');
     await refrescarOrden();
+    setLoading(btn, false);
   } else {
     setLoading(btn, false);
     toast(d.error || 'No se pudo registrar el envío', 'error');
@@ -140,6 +141,7 @@ async function rotacionItem(sku, suc, btn) {
   if (res.ok && d.ok) {
     toast(`Rotación registrada — ${suc} · ${cant} u.`, 'exito');
     await refrescarOrden();
+    setLoading(btn, false);
   } else {
     setLoading(btn, false);
     toast(d.error || 'No se pudo registrar la rotación', 'error');
