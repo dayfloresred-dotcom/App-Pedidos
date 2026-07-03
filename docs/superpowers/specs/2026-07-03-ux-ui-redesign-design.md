@@ -14,7 +14,10 @@ navegador para toda interacción, y sin tratamiento móvil.
 Decisiones tomadas con el usuario (2026-07-03):
 
 - **Alcance**: rediseño visual completo + micro-UX (toasts, confirmaciones,
-  estados de carga). **Sin cambiar flujos** de pantallas ni endpoints.
+  estados de carga) + **eliminación del `location.reload()`** en
+  generar_orden y confirmado vía re-render de fragmento server-side
+  (ampliación pedida por el usuario el 2026-07-03). Los flujos de pantallas
+  y los endpoints de acciones existentes no cambian.
 - **Prioridad**: todas las pantallas por igual (sistema de diseño coherente).
 - **Paleta**: terracota refinada (respeta la dirección estética elegida por
   Day, el creador del sistema). Se evaluó y descartó por ahora la paleta
@@ -100,10 +103,41 @@ letter-spacing.
 - **generar_orden**: tarjetas por droguería con cabecera del color de la
   droguería (tokens, no inline); pills de detalle por sucursal con inputs
   más grandes; botones Enviar/Rotación con `setLoading`; todas las
-  confirmaciones a modal; toasts al completar acciones. El
-  `location.reload()` tras cada acción SE MANTIENE (fase 2 explícitamente
-  fuera de alcance).
+  confirmaciones a modal; toasts al completar acciones. **Sin
+  `location.reload()`**: ver "Refresco por fragmento" abajo.
 - **actualizar_datos**: lista de archivos como tarjetas con fecha y estado.
+
+## Refresco por fragmento (reemplazo del location.reload)
+
+Filosofía HTMX (la del comparador) sin agregar HTMX — la lógica de qué se
+muestra queda 100 % en el servidor, nunca duplicada en JS:
+
+1. **Backend**: extraer el armado de la orden de la vista `generar_orden()`
+   a una función `_armar_orden(filtro_suc)` compartida. Ruta nueva
+   `GET /generar-orden/fragmento?suc=...` (admin) que renderiza solo el
+   partial de la grilla. Los endpoints de acciones (`/api/orden/*`) no
+   cambian.
+2. **Template**: la grilla de tarjetas de `generar_orden.html` se extrae al
+   partial `templates/_orden_grid.html`, incluido con `{% include %}` en la
+   página completa y renderizado solo por la ruta de fragmento.
+3. **JS** (`refrescarOrden()` en generar_orden): tras cada acción exitosa,
+   `fetch` del fragmento y swap de `innerHTML` del contenedor,
+   **preservando**: (a) posición de scroll de la página y de cada
+   card-body, (b) qué filas de detalle estaban expandidas (por
+   `data-rid`), (c) el filtro de sucursal activo y la selección del
+   dropdown de export. Toast de éxito al completar; en error, toast de
+   error sin swap.
+4. **confirmado.html**: mismo patrón liviano — cancelar/restaurar ítem
+   refresca la tabla de ítems vía fragmento `_confirmado_items.html` (o,
+   si el costo/beneficio no cierra durante la implementación, mantiene el
+   reload: es una página liviana; decisión delegada al plan con preferencia
+   por el fragmento).
+
+**Índices SQLite** (van de la mano: sin ellos cada re-render paga el N+1
+completo): en `init_db()`, `CREATE INDEX IF NOT EXISTS` sobre
+`items_solicitud(sku)`, `items_solicitud(solicitud_id)`,
+`envios(sucursal, sku)` y `omitidos(sucursal, sku)`. Cambio aditivo, cero
+comportamiento nuevo.
 
 ## Responsive
 
@@ -116,10 +150,13 @@ letter-spacing.
 
 ## Qué NO cambia
 
-- Endpoints, lógica de negocio JS, flujos de pantallas.
-- `location.reload()` tras acciones en generar_orden (fase 2 futura).
+- Los endpoints de acciones existentes (`/api/orden/*`, `/api/item/*`,
+  exports) y su lógica de negocio.
+- Los flujos de pantallas (mismas pantallas, mismos pasos).
 - Bootstrap 5 CDN sigue siendo la base.
-- El backend no se toca en absoluto.
+- Backend: solo se agregan la ruta de fragmento, el refactor
+  `_armar_orden()` y los índices; nada del modelo de datos ni de los
+  estados cambia.
 
 ## Verificación y deploy
 
@@ -134,8 +171,14 @@ letter-spacing.
 
 ## Riesgos
 
-- Regresión visual/JS en generar_orden (la pantalla más densa): mitigado
-  porque la lógica no se toca y las conversiones `confirm→confirmar` son
-  mecánicas; verificación manual pantalla por pantalla antes de deploy.
+- Regresión en generar_orden (la pantalla más densa) por el refresco de
+  fragmento: riesgo moderado. Mitigación: la lógica de negocio queda
+  íntegramente server-side (el fragmento reusa el mismo código que la
+  página completa), los endpoints de acciones no cambian, y la
+  verificación manual se concentra en esa pantalla (enviar, rotación,
+  omitir, comprar, inexistente, con y sin filtro de sucursal).
+- Estado de UI tras el swap (scroll, detalles expandidos, dropdown export):
+  cubierto explícitamente por `refrescarOrden()`; verificar en la prueba
+  manual encadenando 3+ acciones seguidas.
 - Google Fonts requiere internet en el cliente: fallback `system-ui` cubre
   el caso sin red externa.
