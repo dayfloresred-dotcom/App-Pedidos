@@ -22,3 +22,10 @@ def test_paginas_admin_renderizan(admin):
 
 def test_sucursal_no_ve_admin(sucursal):
     assert sucursal.get('/consolidado').status_code == 403
+
+
+def test_base_incluye_sistema(admin):
+    r = admin.get('/mis-pedidos')
+    assert b'ui.js' in r.data
+    assert b'fonts.googleapis.com' in r.data
+    assert b'navbar-app' in r.data
