@@ -198,6 +198,22 @@ def _load_troqueles_sud():
             continue
     return troqueles
 
+def decidir_drogueria(stock_cd, p_sud, p_suizo):
+    """Regla única de asignación de droguería (usada por archivos y fuentes).
+    Devuelve (drogueria, mejor_precio, drog_ext, precio_ext)."""
+    if p_sud and p_suizo:
+        drog_ext = 'SUD' if p_sud <= p_suizo else 'SUIZO'
+        precio_ext = min(p_sud, p_suizo)
+    elif p_sud:
+        drog_ext, precio_ext = 'SUD', p_sud
+    elif p_suizo:
+        drog_ext, precio_ext = 'SUIZO', p_suizo
+    else:
+        drog_ext, precio_ext = '', None
+    if stock_cd > 0:
+        return 'DROGUERIA RED', None, drog_ext, precio_ext
+    return drog_ext, precio_ext, drog_ext, precio_ext
+
 def load_productos():
     global _productos
     if _productos is not None:
@@ -287,27 +303,10 @@ def load_productos():
                         cant_cd = cd_stock.get(sku, 0)
                 else:
                     cant_cd = cd_stock.get(sku, 0)
-                tiene_cd = cant_cd > 0
 
                 # Always compute external droguería (fallback if CD stock insufficient)
-                p_sud   = sud_p.get(ean)
-                p_suizo = suizo_p.get(ean)
-                if p_sud and p_suizo:
-                    drog_ext = 'SUD' if p_sud <= p_suizo else 'SUIZO'
-                    precio_ext = min(p_sud, p_suizo)
-                elif p_sud:
-                    drog_ext, precio_ext = 'SUD', p_sud
-                elif p_suizo:
-                    drog_ext, precio_ext = 'SUIZO', p_suizo
-                else:
-                    drog_ext, precio_ext = '', None
-
-                if tiene_cd:
-                    drogueria    = 'DROGUERIA RED'
-                    mejor_precio = None
-                else:
-                    drogueria    = drog_ext
-                    mejor_precio = precio_ext
+                drogueria, mejor_precio, drog_ext, precio_ext = decidir_drogueria(
+                    cant_cd, sud_p.get(ean), suizo_p.get(ean))
 
                 suc_data       = {}   # necesidad (ventas - stock)
                 suc_stock_real = {}   # stock actual
