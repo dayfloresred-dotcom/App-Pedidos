@@ -131,9 +131,10 @@ def refrescar_fuentes():
                         if int(p.get('stock_cd') or 0) > 0}
         except Exception:
             stock_cd = {}
-        resumen['fuentes']['quantio'] = {'ok': False,
-                                         'error': f'sin configurar (fallback: {len(stock_cd)} productos con stock CD del último catálogo)',
+        msg = f'sin conectividad al CD — usando último stock conocido ({len(stock_cd)} productos)'
+        resumen['fuentes']['quantio'] = {'ok': False, 'error': msg,
                                          'desde_memoria': False, 'filas': len(stock_cd)}
+        set_fuente_estado('quantio', False, len(stock_cd), msg)
 
     if plex is None or precios is None:
         return resumen
