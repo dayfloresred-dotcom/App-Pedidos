@@ -47,3 +47,21 @@ for sku in muestra:
     print(f"{sku} | {a['drogueria'] or '-'}->{f['drogueria'] or '-'} | "
           f"{a['mejor_precio']}->{f['mejor_precio']} | {a['stock_cd']}->{f['stock_cd']} | "
           f"{a['ventas'].get('CERRO', 0)}->{f['ventas'].get('CERRO', 0)}")
+
+solo_archivos_skus = sorted(set(por_sku_arch) - set(por_sku_fue))
+if solo_archivos_skus:
+    print(f"\nDIAGNOSTICO solo-archivos ({len(solo_archivos_skus)}): que dice Plex vivo de una muestra?")
+    muestra_sa = random.sample(solo_archivos_skus, min(8, len(solo_archivos_skus)))
+    conn = fuentes_plex._conn()
+    try:
+        with conn.cursor() as cur:
+            marcadores = ','.join(['%s'] * len(muestra_sa))
+            cur.execute(f"""SELECT m.CodPlex AS sku, r.Rubro AS rubro
+                FROM medicamentos m LEFT JOIN rubros r ON r.CodRubro = m.CodRubro
+                WHERE m.CodPlex IN ({marcadores})""", muestra_sa)
+            vivos = {str(x['sku']): x['rubro'] for x in cur.fetchall()}
+    finally:
+        conn.close()
+    for sku in muestra_sa:
+        arch = por_sku_arch[sku]
+        print(f"  {sku} | rubro archivo: {arch['rubro']!r} | rubro Plex vivo: {vivos.get(sku, 'NO EXISTE')!r}")

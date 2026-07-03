@@ -39,17 +39,30 @@ def _cargar_con_memoria(nombre, fn_cargar):
 
 def construir_catalogo(plex, precios, stock_cd):
     """Pura: datos de conectores -> lista de productos con la MISMA
-    estructura que produce data_loader.load_productos()."""
+    estructura que produce data_loader.load_productos().
+
+    Relevancia: el catálogo vivo de Plex trae TODOS los productos del rubro
+    (cientos de miles, la mayoría históricos). Se incluye un producto solo si
+    tiene alguna señal operativa: ventas en la ventana, stock en alguna
+    sucursal, stock en el CD, o precio en el comparador — que es el universo
+    que el reporte de presupuesto (pipeline de archivos) representaba."""
     catalogo = []
     mapa_precios = precios.get('precios', {})
+    precios_ean = precios.get('precios_ean', {})
     alfabeta = precios.get('alfabeta', {})
+    alfabeta_ean = precios.get('alfabeta_ean', {})
     for sku, p in plex['productos'].items():
-        pr = mapa_precios.get(sku, {})
+        ean = p.get('ean', '')
+        # precio: primero match por sku (sku_erp del comparador); fallback EAN
+        pr = mapa_precios.get(sku) or (precios_ean.get(ean) if ean else None) or {}
         cant_cd = int(stock_cd.get(sku, 0))
-        drogueria, mejor_precio, drog_ext, _ = decidir_drogueria(
-            cant_cd, pr.get('SUD'), pr.get('SUIZO'))
         ventas = plex['ventas'].get(sku, {})
         stock = plex['stock'].get(sku, {})
+        tiene_precio = bool(pr.get('SUD') or pr.get('SUIZO'))
+        if not (ventas or stock or cant_cd > 0 or tiene_precio):
+            continue  # sin señal operativa: fuera del catálogo
+        drogueria, mejor_precio, drog_ext, _ = decidir_drogueria(
+            cant_cd, pr.get('SUD'), pr.get('SUIZO'))
         sucs = set(ventas) | set(stock)
         necesidad, stock_real, ventas_out = {}, {}, {}
         for s in sucs:
@@ -68,7 +81,7 @@ def construir_catalogo(plex, precios, stock_cd):
             'drogueria':    drogueria,
             'mejor_precio': mejor_precio,
             'drog_ext':     drog_ext,
-            'troquel':      alfabeta.get(sku, '0000000'),
+            'troquel':      alfabeta.get(sku) or (alfabeta_ean.get(ean) if ean else None) or '0000000',
             'troquel_pres': p['troquel'],
             'necesidad':    necesidad,
             'stock_real':   stock_real,
@@ -107,8 +120,19 @@ def refrescar_fuentes():
         resumen['fuentes']['quantio'] = info_q
         set_fuente_estado('quantio', info_q['ok'], info_q['filas'], info_q['error'])
     else:
-        resumen['fuentes']['quantio'] = {'ok': False, 'error': 'sin configurar (Fase 0 pendiente)',
-                                         'desde_memoria': False, 'filas': 0}
+        # Fallback mientras no hay conectividad al Quantio del CD: conservar
+        # el último stock CD conocido (viene del archivo manual o de la
+        # corrida previa). Se actualiza cuando el admin sube el presupuesto.
+        try:
+            import data_loader as _dl
+            stock_cd = {p['sku']: int(p.get('stock_cd') or 0)
+                        for p in _dl.load_productos()
+                        if int(p.get('stock_cd') or 0) > 0}
+        except Exception:
+            stock_cd = {}
+        resumen['fuentes']['quantio'] = {'ok': False,
+                                         'error': f'sin configurar (fallback: {len(stock_cd)} productos con stock CD del último catálogo)',
+                                         'desde_memoria': False, 'filas': len(stock_cd)}
 
     if plex is None or precios is None:
         return resumen

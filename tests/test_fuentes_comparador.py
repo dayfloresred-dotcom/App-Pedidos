@@ -43,3 +43,21 @@ def test_transformar_con_datetimes_aware():
     r = transformar(rows, ahora)
     assert r['precios']['1']['SUD'] == 10.0
     assert r['stale'] is False
+
+
+def test_fallback_por_ean_y_precio_con_descuento():
+    ahora = datetime(2026, 7, 3, 12)
+    rows = [
+        {'sku': None, 'ean': '7790000000009', 'drogueria': 'DDS', 'precio': 55.5,
+         'cod_alfabeta': '1112223', 'consultado_at': ahora},
+        {'sku': '10', 'ean': '7790000000010', 'drogueria': 'SUIZO', 'precio': 20.0,
+         'cod_alfabeta': None, 'consultado_at': ahora},
+    ]
+    r = transformar(rows, ahora)
+    # sin sku: solo entra al mapa por EAN
+    assert '7790000000009' in r['precios_ean']
+    assert r['precios_ean']['7790000000009']['SUD'] == 55.5
+    assert r['alfabeta_ean']['7790000000009'] == '1112223'
+    # con sku: entra a ambos mapas
+    assert r['precios']['10']['SUIZO'] == 20.0
+    assert r['precios_ean']['7790000000010']['SUIZO'] == 20.0
