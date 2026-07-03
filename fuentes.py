@@ -110,6 +110,12 @@ def refrescar_fuentes():
     info_p['filas'] = len(precios['precios']) if precios else 0
     resumen['fuentes']['comparador'] = info_p
     set_fuente_estado('comparador', info_p['ok'], info_p['filas'], info_p['error'])
+    if precios is not None and info_p['ok'] and precios.get('stale'):
+        # snapshots viejos: refleja "Con aviso" en la tarjeta (ultima_ok ya
+        # quedo actualizada por la llamada anterior)
+        aviso = 'precios del comparador con mas de 48 h de antiguedad'
+        info_p['error'] = aviso
+        set_fuente_estado('comparador', False, info_p['filas'], aviso)
 
     stock_cd, no_match = {}, []
     if fuentes_quantio.configurada() and plex:

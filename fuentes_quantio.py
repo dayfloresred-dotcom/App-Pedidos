@@ -4,7 +4,18 @@ QUERY_STOCK y CAMPOS se fijan tras la Fase 0 de exploración del schema
 deshabilitada y el stock CD sale del archivo manual (fallback)."""
 from config import CD_MYSQL, fuente_mysql_configurada
 
-QUERY_STOCK = None  # ← lo fija la tarea de Fase 0 con el schema real
+# Fijada tras la Fase 0 (docs/quantio_cd_schema.md): el CD corre su propio
+# Plex (base plexdr). Stock en `stock` (un solo deposito), catalogo propio en
+# `productos` con Codebar/Troquel para la cascada de matching.
+QUERY_STOCK = """
+    SELECT s.IDProducto AS codigo,
+           p.Codebar AS ean,
+           p.Troquel AS troquel,
+           s.Cantidad AS cantidad
+    FROM stock s
+    LEFT JOIN productos p ON p.IDProducto = s.IDProducto
+    WHERE s.Cantidad > 0 AND s.IDProducto > 0
+"""
 CAMPOS = {'codigo': 'codigo', 'ean': 'ean', 'troquel': 'troquel', 'cantidad': 'cantidad'}
 
 

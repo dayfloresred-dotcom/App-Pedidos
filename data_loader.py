@@ -2,12 +2,15 @@ import csv, re, os, pickle
 from config import (PRESUPUESTO_CSV, LISTADO_STOCK_CSV, STOCK_CD_CSV,
                     PRECIOS_SUD_TXT, PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS,
                     PRECIOS_DDS_XLSX, PRECIOS_SUIZO_CMP_XLSX,
-                    SUCURSALES, BASE_DIR)
+                    SUCURSALES, BASE_DIR, DATA_DIR)
 
 RUBROS   = {'Perfumería', 'Accesorios'}
 EXCLUIR  = {'17', '33'}
 # v2: agrega troquel_pres (Troquel del presupuesto) — el cambio de nombre fuerza regenerar el cache
-CACHE_FILE = os.path.join(BASE_DIR, 'productos_cache_v3.pkl')
+# En DATA_DIR (volumen persistente en el contenedor): el catalogo publicado
+# por las fuentes automaticas sobrevive reinicios/redeploys (finding F1 de la
+# review final 2026-07-03; en /app se perdia con cada restart).
+CACHE_FILE = os.path.join(DATA_DIR, 'productos_cache_v3.pkl')
 SOURCE_FILES = [PRESUPUESTO_CSV, LISTADO_STOCK_CSV, STOCK_CD_CSV,
                 PRECIOS_SUD_TXT, PRECIOS_SUIZO_PERFU, PRECIOS_SUIZO_INS,
                 PRECIOS_DDS_XLSX, PRECIOS_SUIZO_CMP_XLSX]

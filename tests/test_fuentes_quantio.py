@@ -44,3 +44,22 @@ def test_cantidades_se_suman_y_cero_se_ignora():
     stock, no_match = matchear_cd(filas, PRODUCTOS, {})
     assert stock == {'555': 5}
     assert no_match == []
+
+
+def test_forma_real_plexdr():
+    """Filas con la forma real de plexdr (Fase 0): IDProducto estilo CodPlex,
+    Codebar varchar, Troquel int -> el conector normaliza y la cascada matchea
+    por codigo directo cuando el ID coincide con el catalogo central."""
+    import fuentes_quantio
+    assert fuentes_quantio.QUERY_STOCK is not None
+    filas = [
+        {'codigo': '1000100036', 'ean': '7790440536414', 'troquel': '4564271', 'cantidad': 3},
+        {'codigo': '9999999999', 'ean': '7790000000001', 'troquel': '', 'cantidad': 5},
+    ]
+    productos = {
+        '1000100036': {'ean': '7790440536414', 'troquel': '4564271'},
+        '555':        {'ean': '7790000000001', 'troquel': ''},
+    }
+    stock, no_match = fuentes_quantio.matchear_cd(filas, productos, {})
+    assert stock == {'1000100036': 3, '555': 5}  # directo + fallback EAN
+    assert no_match == []
