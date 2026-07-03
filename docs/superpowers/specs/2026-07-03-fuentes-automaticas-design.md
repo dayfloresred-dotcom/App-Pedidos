@@ -158,8 +158,12 @@ La carga manual de archivos queda debajo, rotulada "Fallback manual".
 
 ## Config, dependencias y deploy
 
-- Env vars nuevas: `PLEX_DB_URL`, `COMPARADOR_DB_URL`, `CD_MYSQL_URL`,
-  `VENTAS_VENTANA_DIAS` (default 60), `FUENTES_CRON_TOKEN`.
+- Env vars nuevas (campos separados para evitar problemas de URL-encoding
+  en passwords): `PLEX_HOST`, `PLEX_PORT`, `PLEX_USER`, `PLEX_PASSWORD`,
+  `PLEX_DB`; `CD_HOST`, `CD_PORT`, `CD_USER`, `CD_PASSWORD`, `CD_DB`;
+  `COMPARADOR_DB_URL` (esta sí URL: la genera el deploy en el VPS con el
+  rol pedidos_ro, sin caracteres problemáticos); `VENTAS_VENTANA_DIAS`
+  (default 60), `FUENTES_CRON_TOKEN`.
 - `docker-compose.prod.yml` (repo comparador): pasar las nuevas vars al
   servicio `pedidos` desde el `.env` (`PEDIDOS_*` prefijo en el .env host,
   mapeadas a los nombres internos). `.env.prod.example` actualizado.
