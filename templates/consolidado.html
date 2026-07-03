@@ -20,14 +20,14 @@
         <option value="SUIZO" {% if filtro_drog=='SUIZO' %}selected{% endif %}>SUIZO</option>
       </select>
     </div>
-    <div class="col-auto"><button class="btn btn-sm text-white" style="background:#111">Filtrar</button></div>
+    <div class="col-auto"><button class="btn btn-sm btn-brand">Filtrar</button></div>
     <div class="col-auto"><a href="{{ url_for('consolidado') }}" class="btn btn-sm btn-outline-secondary">Limpiar</a></div>
   </form>
 </div>
 <div class="row g-3 mb-3">
-  <div class="col-4"><div class="bg-light rounded p-3"><div class="small text-muted">Productos</div><div class="fs-4 fw-bold">{{ productos|length }}</div></div></div>
-  <div class="col-4"><div class="bg-light rounded p-3"><div class="small text-muted">Sucursales activas</div><div class="fs-4 fw-bold">{{ n_sucursales }}</div></div></div>
-  <div class="col-4"><div class="bg-light rounded p-3"><div class="small text-muted">Unidades totales</div><div class="fs-4 fw-bold">{{ total_unidades }}</div></div></div>
+  <div class="col-4"><div class="metric-card"><div class="metric-label">Productos</div><div class="metric-valor">{{ productos|length }}</div></div></div>
+  <div class="col-4"><div class="metric-card"><div class="metric-label">Sucursales activas</div><div class="metric-valor">{{ n_sucursales }}</div></div></div>
+  <div class="col-4"><div class="metric-card"><div class="metric-label">Unidades totales</div><div class="metric-valor">{{ total_unidades }}</div></div></div>
 </div>
 <div class="row g-3">
   <div class="col-md-6">
@@ -38,12 +38,12 @@
           <thead><tr><th>SKU</th><th>EAN</th><th>Producto</th><th>Droguería</th><th class="text-center">Total</th></tr></thead>
           <tbody>
             {% for p in productos %}
-            <tr style="cursor:pointer" onclick="verDetalle('{{ p.sku }}','{{ p.descripcion|replace("'", "\\'") }}')">
+            <tr style="cursor:pointer" onclick="verDetalle(event, '{{ p.sku }}','{{ p.descripcion|replace("'", "\\'") }}')">
               <td class="text-muted small">{{ p.sku }}</td>
               <td class="text-muted small" style="font-size:11px">{{ p.ean }}</td>
               <td>{{ p.descripcion[:35] }}</td>
               <td>
-                {% if p.drogueria == 'DROGUERIA RED' %}<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:8px">CD</span>
+                {% if p.drogueria == 'DROGUERIA RED' %}<span class="badge-cd">CD</span>
                 {% elif p.drogueria == 'SUD' %}<span class="badge-sud">SUD</span>
                 {% elif p.drogueria == 'SUIZO' %}<span class="badge-suizo">SUIZO</span>
                 {% else %}<span class="text-muted small">—</span>{% endif %}
@@ -82,7 +82,9 @@
 {% endblock %}
 {% block scripts %}
 <script>
-async function verDetalle(sku, desc) {
+async function verDetalle(event, sku, desc) {
+  document.querySelectorAll('tr.fila-activa').forEach(t => t.classList.remove('fila-activa'));
+  event.currentTarget.classList.add('fila-activa');
   document.getElementById('prod-titulo').textContent = desc;
   const res = await fetch(`/api/detalle-sucursal?sku=${encodeURIComponent(sku)}`);
   const data = await res.json();
