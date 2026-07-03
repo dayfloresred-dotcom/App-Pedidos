@@ -11,83 +11,27 @@
     </div>
     <div class="row g-3 mb-4">
       <div class="col-4">
-        <div class="bg-light rounded p-3">
-          <div class="small text-muted">Número de pedido</div>
-          <div class="sol-number fs-5">{{ sol.numero }}</div>
+        <div class="metric-card">
+          <div class="metric-label">Número de pedido</div>
+          <div class="metric-valor sol-number">{{ sol.numero }}</div>
         </div>
       </div>
       <div class="col-4">
-        <div class="bg-light rounded p-3">
-          <div class="small text-muted">Fecha de solicitud</div>
-          <div class="fw-bold small">{{ sol.fecha_solicitud }}</div>
+        <div class="metric-card">
+          <div class="metric-label">Fecha de solicitud</div>
+          <div class="metric-valor fs-6">{{ sol.fecha_solicitud }}</div>
         </div>
       </div>
       <div class="col-4">
-        <div class="bg-light rounded p-3">
-          <div class="small text-muted">Fecha de compra</div>
+        <div class="metric-card">
+          <div class="metric-label">Fecha de compra</div>
           <div class="text-muted fst-italic small">Pendiente de compra…</div>
         </div>
       </div>
     </div>
-    {% set ORIGEN = {'CD':'Centro de Distribución','SUD':'Droguería Sud','SUIZO':'Droguería Suizo','ROT':'Rotación','INEXISTENTE':'Producto inexistente'} %}
-    {% set ENVLBL = {'CD':'CD','SUD':'Sud','SUIZO':'Suizo','ROT':'Rotación'} %}
-    <table class="table table-sm">
-      <thead><tr>
-        <th>EAN</th><th>Producto</th><th>Laboratorio</th>
-        <th class="text-center">Solicitado</th><th class="text-center">Enviado</th><th class="text-center">Estado</th>
-        <th class="text-center">Llega desde</th><th></th>
-      </tr></thead>
-      <tbody>
-        {% for it in items %}
-        <tr {% if it.cancelado %}style="opacity:.6"{% endif %}>
-          <td class="text-muted small">{{ it.ean }}</td>
-          <td>{{ it.descripcion }}</td>
-          <td>{{ it.laboratorio }}</td>
-          <td class="text-center fw-bold">{{ it.cantidad }}</td>
-          <td class="text-center">
-            {% set env = envios.get(it.sku, {}) %}
-            {% if env %}
-              <span class="fw-bold" style="color:#075985">{{ env.values()|sum }}</span>
-              <div class="small text-muted">{% for code, cc in env.items() %}{{ cc }} {{ ENVLBL.get(code, code) }}{% if not loop.last %} + {% endif %}{% endfor %}</div>
-            {% else %}
-              <span class="text-muted small">—</span>
-            {% endif %}
-          </td>
-          <td class="text-center">
-            {% if it.cancelado %}
-              <span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 8px;border-radius:8px">✕ Cancelado</span>
-            {% elif it.comprado %}
-              <span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 8px;border-radius:8px">✓ Pedido realizado</span>
-            {% elif it.ordenado %}
-              <span style="background:#fff7ed;color:#9a3412;font-size:11px;padding:2px 8px;border-radius:8px">✓ Pedido generado</span>
-            {% else %}
-              <span style="background:#fef9c3;color:#854d0e;font-size:11px;padding:2px 8px;border-radius:8px">⏳ Pendiente</span>
-            {% endif %}
-          </td>
-          <td class="text-center">
-            {% if it.drogueria_final == 'INEXISTENTE' %}
-              <span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 8px;border-radius:8px">Producto inexistente</span>
-            {% elif it.cancelado %}
-              <span class="text-muted small">—</span>
-            {% elif it.drogueria_final %}
-              <span style="background:#e0f2fe;color:#075985;font-size:11px;padding:2px 8px;border-radius:8px">{{ ORIGEN.get(it.drogueria_final, it.drogueria_final) }}</span>
-            {% else %}
-              <span class="text-muted small">A definir</span>
-            {% endif %}
-          </td>
-          <td class="text-center">
-            {% if it.cancelado %}
-            <button class="btn btn-sm btn-link text-success p-0" title="Restaurar (vuelve a Generar orden)"
-              onclick="restaurarItem({{ it.id }})">&#8635; Restaurar</button>
-            {% elif not it.comprado and sol.estado == 'pendiente' %}
-            <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar este producto"
-              onclick="cancelarItem({{ it.id }})">✕</button>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="tabla-card" id="items-wrap">
+      {% include '_confirmado_items.html' %}
+    </div>
     <div class="d-flex justify-content-between mt-3">
       <div>
         {% if sol.estado == 'pendiente' %}
@@ -108,13 +52,16 @@
 {% block scripts %}
 <script>
 async function cancelarItem(itemId) {
-  if (!confirm('¿Cancelar este producto de tu pedido?')) return;
+  const ok = await confirmar('El producto vuelve a poder restaurarse después.',
+    {titulo: '¿Cancelar este producto?', accion: 'Cancelar producto'});
+  if (!ok) return;
   const res = await fetch('/api/item/cancelar', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({item_id: itemId})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo cancelar.');
+  if (res.ok && d.ok) { toast('Producto cancelado', 'exito'); refrescarItems(); }
+  else toast(d.error || 'No se pudo cancelar', 'error');
 }
 
 async function restaurarItem(itemId) {
@@ -123,7 +70,14 @@ async function restaurarItem(itemId) {
     body: JSON.stringify({item_id: itemId})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) location.reload(); else alert(d.error || 'No se pudo restaurar.');
+  if (res.ok && d.ok) { toast('Producto restaurado', 'exito'); refrescarItems(); }
+  else toast(d.error || 'No se pudo restaurar', 'error');
+}
+
+async function refrescarItems() {
+  const res = await fetch(location.pathname + '/fragmento');
+  if (!res.ok) { location.reload(); return; }
+  document.getElementById('items-wrap').innerHTML = await res.text();
 }
 </script>
 {% endblock %}

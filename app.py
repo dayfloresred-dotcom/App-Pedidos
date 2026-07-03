@@ -78,6 +78,17 @@ def ver_solicitud(sol_id):
     envios = get_envios_sucursal(sol['sucursal'])
     return render_template('confirmado.html', sol=sol, items=items, envios=envios)
 
+@app.route('/confirmado/<int:sol_id>/fragmento')
+@login_required
+def ver_solicitud_fragmento(sol_id):
+    sol, items = get_solicitud_detalle(sol_id)
+    if not sol:
+        return 'No encontrada', 404
+    if session.get('rol') != 'admin' and sol['sucursal'] != session.get('username'):
+        return 'Sin permiso', 403
+    envios = get_envios_sucursal(sol['sucursal'])
+    return render_template('_confirmado_items.html', sol=sol, items=items, envios=envios)
+
 @app.route('/solicitud/<int:sol_id>/cancelar', methods=['POST'])
 @login_required
 def cancelar(sol_id):

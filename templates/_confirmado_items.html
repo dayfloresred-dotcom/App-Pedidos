@@ -1,0 +1,60 @@
+{% set ORIGEN = {'CD':'Centro de Distribución','SUD':'Droguería Sud','SUIZO':'Droguería Suizo','ROT':'Rotación','INEXISTENTE':'Producto inexistente'} %}
+{% set ENVLBL = {'CD':'CD','SUD':'Sud','SUIZO':'Suizo','ROT':'Rotación'} %}
+{% set ORIGEN_BADGE = {'CD':'badge-cd','SUD':'badge-sud','SUIZO':'badge-suizo','ROT':'badge-rot','INEXISTENTE':'badge-cancelado'} %}
+<table class="table table-sm">
+  <thead><tr>
+    <th>EAN</th><th>Producto</th><th>Laboratorio</th>
+    <th class="text-center">Solicitado</th><th class="text-center">Enviado</th><th class="text-center">Estado</th>
+    <th class="text-center">Llega desde</th><th></th>
+  </tr></thead>
+  <tbody>
+    {% for it in items %}
+    <tr {% if it.cancelado %}style="opacity:.6"{% endif %}>
+      <td class="text-muted small">{{ it.ean }}</td>
+      <td>{{ it.descripcion }}</td>
+      <td>{{ it.laboratorio }}</td>
+      <td class="text-center fw-bold">{{ it.cantidad }}</td>
+      <td class="text-center">
+        {% set env = envios.get(it.sku, {}) %}
+        {% if env %}
+          <span class="fw-bold" style="color:#075985">{{ env.values()|sum }}</span>
+          <div class="small text-muted">{% for code, cc in env.items() %}{{ cc }} {{ ENVLBL.get(code, code) }}{% if not loop.last %} + {% endif %}{% endfor %}</div>
+        {% else %}
+          <span class="text-muted small">—</span>
+        {% endif %}
+      </td>
+      <td class="text-center">
+        {% if it.cancelado %}
+          <span class="badge-cancelado">✕ Cancelado</span>
+        {% elif it.comprado %}
+          <span class="badge-comprado">✓ Pedido realizado</span>
+        {% elif it.ordenado %}
+          <span class="badge-generado">✓ Pedido generado</span>
+        {% else %}
+          <span class="badge-pendiente">⏳ Pendiente</span>
+        {% endif %}
+      </td>
+      <td class="text-center">
+        {% if it.drogueria_final == 'INEXISTENTE' %}
+          <span class="badge-cancelado">Producto inexistente</span>
+        {% elif it.cancelado %}
+          <span class="text-muted small">—</span>
+        {% elif it.drogueria_final %}
+          <span class="{{ ORIGEN_BADGE.get(it.drogueria_final, 'badge-cd') }}">{{ ORIGEN.get(it.drogueria_final, it.drogueria_final) }}</span>
+        {% else %}
+          <span class="text-muted small">A definir</span>
+        {% endif %}
+      </td>
+      <td class="text-center">
+        {% if it.cancelado %}
+        <button class="btn btn-sm btn-link text-success p-0" title="Restaurar (vuelve a Generar orden)"
+          onclick="restaurarItem({{ it.id }})">&#8635; Restaurar</button>
+        {% elif not it.comprado and sol.estado == 'pendiente' %}
+        <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar este producto"
+          onclick="cancelarItem({{ it.id }})">✕</button>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
