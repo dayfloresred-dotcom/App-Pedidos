@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h5 class="mb-3">Actualizar datos</h5>
+<h5 class="mb-1">Actualizar archivos de datos</h5>
 
 <h5 class="mb-3">Fuentes automáticas</h5>
 <div class="row g-3 mb-3">
@@ -92,7 +92,7 @@
     </div>
   </div>
 </form>
-
+{% endblock %}
 {% block scripts %}
 <script>
 async function refrescarFuentes(btn) {
@@ -113,5 +113,4 @@ async function refrescarFuentes(btn) {
   }
 }
 </script>
-{% endblock %}
 {% endblock %}
