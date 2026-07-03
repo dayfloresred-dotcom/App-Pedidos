@@ -10,7 +10,7 @@ def test_config_fuentes_defaults_y_env(monkeypatch):
     importlib.reload(config)
     assert config.PLEX['host'] == 'h1' and config.PLEX['port'] == 6613
     assert config.VENTAS_VENTANA_DIAS == 45
-    assert config.FUENTES_RUBROS == ['Perfumería', 'Accesorios']
+    assert config.FUENTES_RUBROS == []  # default sin filtro de rubro
     assert config.fuente_mysql_configurada(config.PLEX) is False  # falta user/pass/db
     monkeypatch.setenv('PLEX_USER', 'u')
     monkeypatch.setenv('PLEX_PASSWORD', 'p')

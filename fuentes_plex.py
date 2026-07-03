@@ -25,7 +25,7 @@ Q_PRODUCTOS = """
     FROM medicamentos m
     LEFT JOIN laboratorios l ON l.CodLab = m.CodLab
     LEFT JOIN rubros r ON r.CodRubro = m.CodRubro
-    WHERE r.Rubro IN ({placeholders})
+    {filtro_rubros}
 """
 
 # EAN "principal": medicamentos.codebar tiene prioridad; productoscodebars
@@ -126,8 +126,11 @@ def cargar():
     conn = _conn()
     try:
         with conn.cursor() as cur:
-            q_prod = Q_PRODUCTOS.format(placeholders=','.join(['%s'] * len(FUENTES_RUBROS)))
-            cur.execute(q_prod, FUENTES_RUBROS)
+            if FUENTES_RUBROS:
+                filtro = 'WHERE r.Rubro IN (' + ','.join(['%s'] * len(FUENTES_RUBROS)) + ')'
+                cur.execute(Q_PRODUCTOS.format(filtro_rubros=filtro), FUENTES_RUBROS)
+            else:
+                cur.execute(Q_PRODUCTOS.format(filtro_rubros=''))
             rows_prod = cur.fetchall()
             cur.execute(Q_EANS)
             rows_eans = cur.fetchall()

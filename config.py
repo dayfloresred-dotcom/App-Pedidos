@@ -86,6 +86,9 @@ def fuente_mysql_configurada(cfg):
 
 COMPARADOR_DB_URL   = os.environ.get('COMPARADOR_DB_URL', '')
 VENTAS_VENTANA_DIAS = int(os.environ.get('VENTAS_VENTANA_DIAS') or 60)
+# FUENTES_RUBROS vacío = sin filtro de rubro (el presupuesto real incluye
+# Medicamentos además de Perfumería/Accesorios; el filtro de relevancia por
+# ventas/stock es el que acota el catálogo). Setear la env para restringir.
 FUENTES_RUBROS      = [s.strip() for s in
-                       (os.environ.get('FUENTES_RUBROS') or 'Perfumería,Accesorios').split(',') if s.strip()]
+                       (os.environ.get('FUENTES_RUBROS') or '').split(',') if s.strip()]
 FUENTES_CRON_TOKEN  = os.environ.get('FUENTES_CRON_TOKEN', '')

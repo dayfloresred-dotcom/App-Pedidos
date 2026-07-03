@@ -41,11 +41,11 @@ def construir_catalogo(plex, precios, stock_cd):
     """Pura: datos de conectores -> lista de productos con la MISMA
     estructura que produce data_loader.load_productos().
 
-    Relevancia: el catálogo vivo de Plex trae TODOS los productos del rubro
-    (cientos de miles, la mayoría históricos). Se incluye un producto solo si
-    tiene alguna señal operativa: ventas en la ventana, stock en alguna
-    sucursal, stock en el CD, o precio en el comparador — que es el universo
-    que el reporte de presupuesto (pipeline de archivos) representaba."""
+    Relevancia: el catálogo vivo de Plex trae TODOS los productos (cientos de
+    miles, la mayoría históricos). Se incluye un producto solo si tiene señal
+    operativa EN LA CADENA: ventas en la ventana, stock en alguna sucursal, o
+    stock en el CD — el universo que el reporte de presupuesto representaba.
+    Tener precio en el comparador no alcanza (sería medio catálogo nacional)."""
     catalogo = []
     mapa_precios = precios.get('precios', {})
     precios_ean = precios.get('precios_ean', {})
@@ -58,9 +58,10 @@ def construir_catalogo(plex, precios, stock_cd):
         cant_cd = int(stock_cd.get(sku, 0))
         ventas = plex['ventas'].get(sku, {})
         stock = plex['stock'].get(sku, {})
-        tiene_precio = bool(pr.get('SUD') or pr.get('SUIZO'))
-        if not (ventas or stock or cant_cd > 0 or tiene_precio):
-            continue  # sin señal operativa: fuera del catálogo
+        if not (ventas or stock or cant_cd > 0):
+            # Sin movimiento en la cadena: fuera del catálogo. (Tener precio
+            # en el comparador NO alcanza — incluiría medio catálogo nacional.)
+            continue
         drogueria, mejor_precio, drog_ext, _ = decidir_drogueria(
             cant_cd, pr.get('SUD'), pr.get('SUIZO'))
         sucs = set(ventas) | set(stock)

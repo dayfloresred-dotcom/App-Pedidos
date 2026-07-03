@@ -92,14 +92,14 @@ def test_relevancia_excluye_sin_senal_y_fallback_ean():
                   'ean': '7790000000033', 'troquel': ''},
         },
         'ventas': {'1': {'CERRO': 5}},
-        'stock': {},
+        'stock': {'3': {'RECTA': 2}},
     }
     precios = {'precios': {}, 'precios_ean': {'7790000000033': {'SUD': 12.0, 'SUIZO': None}},
                'alfabeta': {}, 'alfabeta_ean': {'7790000000033': '9998887'},
                'mas_reciente': None, 'stale': False}
     cat = fuentes.construir_catalogo(plex, precios, {})
     skus = {p['sku'] for p in cat}
-    assert skus == {'1', '3'}  # el 2 (sin señal operativa) queda fuera
+    assert skus == {'1', '3'}  # el 2 (sin ventas/stock/CD) queda fuera aunque tuviera precio
     p3 = next(p for p in cat if p['sku'] == '3')
     assert p3['drogueria'] == 'SUD' and p3['mejor_precio'] == 12.0  # matcheo por EAN
     assert p3['troquel'] == '9998887'  # alfabeta por EAN
