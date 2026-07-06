@@ -10,6 +10,7 @@
       <option value="todo" {% if period=='todo' %}selected{% endif %}>Histórico (todo)</option>
     </select>
   </form>
+  <a class="btn btn-sm text-white" style="background:#0f766e" href="{{ url_for('ranking_export', period=period) }}">↓ Descargar (.xlsx)</a>
 </div>
 
 <div class="row g-3">
@@ -35,12 +36,12 @@
       <div class="card-header fw-bold" style="background:#f2efe8">Productos más pedidos</div>
       <div class="table-responsive" style="max-height:520px;overflow-y:auto">
         <table class="table table-sm table-hover mb-0">
-          <thead><tr><th style="width:40px">#</th><th>Producto</th><th class="text-end">Unidades</th></tr></thead>
+          <thead><tr><th style="width:40px">#</th><th>Producto</th><th>Laboratorio</th><th class="text-end">Unidades</th></tr></thead>
           <tbody>
-            {% for desc, u in prods %}
-            <tr><td class="text-muted">{{ loop.index }}</td><td>{{ desc }}</td><td class="text-end fw-bold">{{ u }}</td></tr>
+            {% for desc, lab, u in prods %}
+            <tr><td class="text-muted">{{ loop.index }}</td><td>{{ desc }}</td><td class="small text-muted">{{ lab }}</td><td class="text-end fw-bold">{{ u }}</td></tr>
             {% else %}
-            <tr><td colspan="3" class="text-center text-muted py-4">Sin datos para este período</td></tr>
+            <tr><td colspan="4" class="text-center text-muted py-4">Sin datos para este período</td></tr>
             {% endfor %}
           </tbody>
         </table>

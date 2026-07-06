@@ -128,6 +128,37 @@ def ranking():
     labs, prods = get_ranking(period)
     return render_template('ranking.html', labs=labs[:30], prods=prods[:50], period=period)
 
+@app.route('/ranking/export.xlsx')
+@login_required
+@admin_required
+def ranking_export():
+    import io, openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    period = request.args.get('period', 'pendiente')
+    if period not in ('pendiente', 'mes', 'todo'):
+        period = 'pendiente'
+    labs, prods = get_ranking(period)
+    wb = openpyxl.Workbook()
+    fill = PatternFill('solid', start_color='1F4E78')
+    ws1 = wb.active; ws1.title = 'Laboratorios'
+    ws1.append(['#', 'Laboratorio', 'Unidades'])
+    for i, (lab, u) in enumerate(labs, 1):
+        ws1.append([i, lab, u])
+    ws2 = wb.create_sheet('Productos')
+    ws2.append(['#', 'Producto', 'Laboratorio', 'Unidades'])
+    for i, (desc, lab, u) in enumerate(prods, 1):
+        ws2.append([i, desc, lab, u])
+    for ws in (ws1, ws2):
+        for c in ws[1]:
+            c.font = Font(bold=True, color='FFFFFF'); c.fill = fill; c.alignment = Alignment(horizontal='center')
+    ws1.column_dimensions['B'].width = 32; ws1.column_dimensions['C'].width = 12
+    ws2.column_dimensions['B'].width = 45; ws2.column_dimensions['C'].width = 28; ws2.column_dimensions['D'].width = 12
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    filename = f'ranking_{period}_{now_local().strftime("%d%m%y")}.xlsx'
+    return Response(buf.read(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
 @app.route('/generar-orden')
 @login_required
 @admin_required

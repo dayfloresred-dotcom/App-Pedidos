@@ -519,10 +519,10 @@ def get_ranking(period='pendiente'):
                 continue
         lab = r['laboratorio'] or '(sin laboratorio)'
         labs[lab] = labs.get(lab, 0) + (r['cantidad'] or 0)
-        key = (r['sku'], r['descripcion'])
+        key = (r['sku'], r['descripcion'], lab)
         prods[key] = prods.get(key, 0) + (r['cantidad'] or 0)
     labs_r  = sorted(labs.items(), key=lambda x: -x[1])
-    prods_r = sorted([(k[1], v) for k, v in prods.items()], key=lambda x: -x[1])
+    prods_r = sorted([(k[1], k[2], v) for k, v in prods.items()], key=lambda x: -x[2])
     return labs_r, prods_r
 
 def carrito_set(sucursal, sku, ean, desc, lab, drog, cantidad, observacion=None):
