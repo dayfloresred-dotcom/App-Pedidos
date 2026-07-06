@@ -78,6 +78,21 @@ curl -I https://pedidos.farmaciasred.com/health   # esperado: 200
 Con esto la app arranca VACÍA (base nueva, usuarios semilla). Falta migrar los
 datos reales.
 
+## Deploy de cambios (post-cutover 2026-07-06)
+
+`/opt/App-Pedidos` es un clone de este repo (rama `main`). Para deployar:
+
+```bash
+ssh -p 5930 root@179.43.123.251
+cd /opt/App-Pedidos && git pull --ff-only
+cd /opt/farmacias-red-comparador
+docker compose -f docker-compose.prod.yml up -d --build pedidos
+curl -I https://pedidos.farmaciasred.com/login   # esperado: 200
+```
+
+La base y los archivos de datos viven en el volumen (`/data` del contenedor):
+un rebuild NO los toca. Backups de la base en `/root/backups-pedidos/` del VPS.
+
 ## Migración de datos desde PythonAnywhere
 
 La cuenta gratuita no tiene SSH; los archivos se bajan desde la web.
