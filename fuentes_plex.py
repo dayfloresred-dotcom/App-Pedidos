@@ -12,6 +12,10 @@ Deltas de nombres validados contra erp_mysql_schema_legacy.md y etl/etl.py
     productoscodebars como alternativos/secundarios (ver sync_dim_productos_eans
     en etl.py). Q_EANS replica ese orden de prioridad: primero el codebar de
     medicamentos, luego productoscodebars como fallback.
+  - Ventas en CAJAS: factlineas.CantDecimal está siempre en cajas; Cantidad
+    viene en unidades sueltas cuando TipoCantidad='U' (venta fraccionada) y
+    sumarla infla ×UnidadesPorCaja esos productos (verificado contra el
+    informe manual de Ventas y Stock, 2026-07-06).
 """
 from datetime import date, timedelta
 
@@ -45,7 +49,7 @@ Q_EANS = """
 
 Q_VENTAS = """
     SELECT fl.IDProducto AS sku, fc.Sucursal AS sucursal,
-           SUM(CASE WHEN fc.Tipo = 'NC' THEN -fl.Cantidad ELSE fl.Cantidad END) AS unidades
+           SUM(CASE WHEN fc.Tipo = 'NC' THEN -fl.CantDecimal ELSE fl.CantDecimal END) AS unidades
     FROM factlineas fl
     INNER JOIN factcabecera fc ON fc.IDComprobante = fl.IDComprobante
     WHERE fc.Emision >= %s

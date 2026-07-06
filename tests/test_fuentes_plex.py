@@ -1,4 +1,4 @@
-from fuentes_plex import transformar
+from fuentes_plex import Q_VENTAS, transformar
 
 
 def test_transformar_arma_estructura():
@@ -21,6 +21,22 @@ def test_transformar_arma_estructura():
     assert r['ventas']['555'] == {'CERRO': 10}
     assert r['stock']['556'] == {'RECTA': 4}
     assert '777' not in r['ventas']
+
+
+def test_q_ventas_suma_cant_decimal():
+    """Las líneas fraccionadas (TipoCantidad='U') traen Cantidad en unidades
+    sueltas; CantDecimal está SIEMPRE en cajas (verificado contra el informe
+    manual 2026-07-06). Sumar Cantidad infla ×UnidadesPorCaja los fraccionados."""
+    assert 'fl.CantDecimal' in Q_VENTAS
+    assert '-fl.Cantidad ELSE fl.Cantidad' not in Q_VENTAS
+
+
+def test_transformar_ventas_decimales_truncan_a_cajas():
+    """SUM(CantDecimal) devuelve float (16.5 cajas): se trunca a entero,
+    igual que el informe manual."""
+    rows_prod = [{'sku': 1, 'descripcion': 'P', 'laboratorio': 'L', 'rubro': 'Medicamentos', 'troquel': None}]
+    r = transformar(rows_prod, [], [{'sku': 1, 'sucursal': 2, 'unidades': 16.5}], [])
+    assert r['ventas']['1'] == {'CERRO': 16}
 
 
 def test_ventas_negativas_no_rompen():
