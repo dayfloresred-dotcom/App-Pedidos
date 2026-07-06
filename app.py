@@ -1,7 +1,7 @@
 import os
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify, flash, Response
 from datetime import date, datetime
-from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER, now_local
+from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER, now_local, local_from_ts
 from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas_solicitudes,
                        get_consolidado, get_detalle_por_sucursal, marcar_comprado, cancelar_solicitud,
                        get_db, actualizar_droguerias_pendientes,
@@ -681,7 +681,7 @@ def actualizar_datos():
         path = cfg['path']
         if os.path.exists(path):
             mtime = os.path.getmtime(path)
-            info = {'existe': True, 'fecha': datetime.fromtimestamp(mtime).strftime('%d/%m/%Y %H:%M')}
+            info = {'existe': True, 'fecha': local_from_ts(mtime).strftime('%d/%m/%Y %H:%M')}
         else:
             info = {'existe': False, 'fecha': '—'}
         archivos_info[field] = {**cfg, **info, 'nombre': os.path.basename(path)}
