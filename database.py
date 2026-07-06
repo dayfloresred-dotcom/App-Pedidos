@@ -614,7 +614,8 @@ def get_cumplimiento(dias=None):
         if f < d['desde']:
             d['desde'] = f
     demorados = sorted(
-        ({**d, 'sucursales': sorted(d['sucursales']), 'dias': (hoy - d.pop('desde')).days}
+        ({'sku': d['sku'], 'descripcion': d['descripcion'], 'cantidad': d['cantidad'],
+          'sucursales': sorted(d['sucursales']), 'dias': (hoy - d['desde']).days}
          for d in dem.values()),
         key=lambda x: -x['dias'])
 

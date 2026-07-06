@@ -54,6 +54,7 @@ def test_get_cumplimiento_demorados(datos_cumplimiento):
     assert dem['cantidad'] == 4
     assert dem['dias'] >= 0
     assert 'CERRO' in dem['sucursales']
+    assert 'desde' not in dem  # campo interno: no debe filtrarse (date no es JSON-serializable)
     # el comprado NO aparece como demorado
     assert not any(d['sku'] == 'CU1' for d in r['demorados'])
 
