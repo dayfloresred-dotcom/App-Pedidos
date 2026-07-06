@@ -13,17 +13,18 @@ def generar_suizo(items):
 
 def generar_sud(items):
     """
-    SUD .dds format:
-    EAN (13) + troquel (7) + product name (33, truncated/padded) + quantity
+    SUD .dds (ancho fijo, 54 chars, CRLF):
+    EAN(13) + Troquel(7) + Nombre(30) + Cantidad(4, alineada a la derecha).
+    La cantidad va en un campo propio para que los dígitos del nombre no la invadan.
     """
     lines = []
     for it in items:
-        ean     = (it.get('ean') or '').ljust(13)[:13]
-        troquel = (it.get('troquel') or '0000000').zfill(7)[:7]
-        nombre  = (it.get('descripcion') or '').ljust(33)[:33]
-        qty     = str(it['cantidad'])
+        ean     = (it.get('ean') or '').strip().ljust(13)[:13]
+        troquel = ''.join(ch for ch in str(it.get('troquel') or '') if ch.isdigit()).zfill(7)[:7]
+        nombre  = (it.get('descripcion') or '').strip()[:30].ljust(30)
+        qty     = str(it['cantidad'])[:4].rjust(4)
         lines.append(f"{ean}{troquel}{nombre}{qty}")
-    return '\n'.join(lines)
+    return '\r\n'.join(lines)
 
 def generar_quantio(items):
     """

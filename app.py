@@ -581,7 +581,7 @@ def exportar(drogueria):
         filename = f'sud_{suc_slug}_{now_local().strftime("%d%m%y")}.dds'
 
     return Response(
-        content,
+        content.encode('latin-1', errors='replace'),
         mimetype='application/octet-stream',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
