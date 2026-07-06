@@ -2,14 +2,14 @@
 {% block content %}
 <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
   <h5 class="mb-0">🛒 Carrito · {{ sucursal }}</h5>
-  <span class="text-muted small">{{ items|length }} productos · {{ total }} u.</span>
-  <a href="{{ url_for('nueva_solicitud') }}" class="btn btn-sm btn-outline-secondary ms-auto">← Seguir agregando</a>
+  <span class="text-muted small"><span id="n-items">{{ items|length }}</span> productos · <span id="n-unidades">{{ total }}</span> u.</span>
+  <a href="{{ url_for('nueva_solicitud') }}" class="btn btn-sm btn-suave ms-auto">← Seguir agregando</a>
 </div>
 
 {% if not items %}
   <div class="alert alert-info">El carrito está vacío. Andá a <b>Nueva solicitud</b> y cargá productos.</div>
 {% else %}
-<div class="card">
+<div class="tabla-card">
   <div class="table-responsive">
   <table class="table table-sm table-hover mb-0 align-middle">
     <thead><tr>
@@ -17,14 +17,14 @@
       <th class="text-center" style="width:90px">Cantidad</th>
       <th style="width:260px">Observación</th><th></th>
     </tr></thead>
-    <tbody>
+    <tbody id="tbody-carrito">
       {% for it in items %}
-      <tr data-sku="{{ it.sku }}">
+      <tr data-sku="{{ it.sku }}" data-cant="{{ it.cantidad }}">
         <td class="text-muted small">{{ it.ean }}</td>
         <td>{{ it.descripcion }}</td>
         <td>{{ it.laboratorio }}</td>
         <td class="text-center">
-          <input type="number" min="0" class="form-control form-control-sm" value="{{ it.cantidad }}"
+          <input type="number" min="0" class="form-control form-control-sm qty-input" value="{{ it.cantidad }}"
             onchange="cambiarCant('{{ it.sku }}', this)">
         </td>
         <td>
@@ -32,16 +32,16 @@
             value="{{ it.observacion or '' }}" onchange="cambiarObs('{{ it.sku }}', this.value)">
         </td>
         <td class="text-center">
-          <button class="btn btn-sm btn-link text-danger p-0" title="Quitar" onclick="quitar('{{ it.sku }}')">✕</button>
+          <button class="btn btn-sm btn-link text-danger p-0" title="Quitar" onclick="quitar('{{ it.sku }}', this)">✕</button>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   </div>
-  <div class="card-footer d-flex gap-2 justify-content-between">
-    <button class="btn btn-sm btn-outline-danger" onclick="cancelarTodo()">✕ Cancelar pedido (vaciar carrito)</button>
-    <button class="btn btn-sm text-white" style="background:#166534" onclick="confirmar()">✓ Confirmar solicitud</button>
+  <div class="card-footer d-flex gap-2 justify-content-between flex-wrap">
+    <button class="btn btn-sm btn-peligro" onclick="cancelarTodo(this)">✕ Cancelar pedido (vaciar carrito)</button>
+    <button class="btn btn-sm btn-brand" onclick="confirmarCarrito(this)">Confirmar solicitud ✓</button>
   </div>
 </div>
 {% endif %}
@@ -51,47 +51,81 @@
 <script>
 const SUC = '{{ sucursal }}';
 
+function actualizarResumen() {
+  const filas = document.querySelectorAll('#tbody-carrito tr');
+  let unidades = 0;
+  filas.forEach(tr => unidades += parseInt(tr.dataset.cant, 10) || 0);
+  document.getElementById('n-items').textContent = filas.length;
+  document.getElementById('n-unidades').textContent = unidades;
+  if (!filas.length) location.reload();   // muestra el estado vacío
+}
+
 async function cambiarCant(sku, inp) {
   const cant = parseInt(inp.value, 10) || 0;
-  const res = await fetch('/api/carrito/set', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({sucursal: SUC, sku, cantidad: cant})
-  });
-  if (res.ok) { if (cant<=0) location.reload(); } else alert('No se pudo actualizar.');
+  try {
+    const res = await fetch('/api/carrito/set', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sucursal: SUC, sku, cantidad: cant})
+    });
+    if (!res.ok) { toast('No se pudo actualizar', 'error'); return; }
+    const tr = inp.closest('tr');
+    if (cant <= 0) tr.remove(); else tr.dataset.cant = cant;
+    actualizarResumen();
+  } catch (e) { toast('Error de conexión', 'error'); }
 }
 
 async function cambiarObs(sku, obs) {
-  await fetch('/api/carrito/obs', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({sucursal: SUC, sku, observacion: obs})
-  });
+  try {
+    await fetch('/api/carrito/obs', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sucursal: SUC, sku, observacion: obs})
+    });
+  } catch (e) { toast('No se pudo guardar la observación', 'error'); }
 }
 
-async function quitar(sku) {
-  const res = await fetch('/api/carrito/set', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({sucursal: SUC, sku, cantidad: 0})
-  });
-  if (res.ok) location.reload();
+async function quitar(sku, btn) {
+  try {
+    const res = await fetch('/api/carrito/set', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sucursal: SUC, sku, cantidad: 0})
+    });
+    if (!res.ok) { toast('No se pudo quitar', 'error'); return; }
+    btn.closest('tr').remove();
+    actualizarResumen();
+  } catch (e) { toast('Error de conexión', 'error'); }
 }
 
-async function cancelarTodo() {
-  if (!confirm('¿Vaciar el carrito? Se borran todos los productos cargados.')) return;
-  const res = await fetch('/api/carrito/clear', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({sucursal: SUC})
-  });
-  if (res.ok) window.location = '/nueva-solicitud';
+async function cancelarTodo(btn) {
+  const ok = await confirmar('Se borran todos los productos cargados en el carrito de ' + SUC + '.',
+                             {titulo: '¿Vaciar el carrito?', accion: 'Vaciar'});
+  if (!ok) return;
+  setLoading(btn, true);
+  try {
+    const res = await fetch('/api/carrito/clear', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sucursal: SUC})
+    });
+    if (res.ok) { window.location = '/nueva-solicitud'; return; }
+    toast('No se pudo vaciar el carrito', 'error');
+  } catch (e) { toast('Error de conexión', 'error'); }
+  setLoading(btn, false);
 }
 
-async function confirmar() {
-  const res = await fetch('/api/carrito/confirmar', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({sucursal: SUC})
-  });
-  const d = await res.json().catch(()=>({}));
-  if (res.ok && d.ok) window.location = '/confirmado/' + d.sol_id;
-  else alert(d.error || 'No se pudo confirmar.');
+async function confirmarCarrito(btn) {
+  const ok = await confirmar('Se crea la solicitud de ' + SUC + ' con los productos del carrito.',
+                             {titulo: 'Confirmar solicitud', accion: 'Confirmar ✓', peligro: false});
+  if (!ok) return;
+  setLoading(btn, true);
+  try {
+    const res = await fetch('/api/carrito/confirmar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sucursal: SUC})
+    });
+    const d = await res.json().catch(()=>({}));
+    if (res.ok && d.ok) { window.location = '/confirmado/' + d.sol_id; return; }
+    toast(d.error || 'No se pudo confirmar', 'error');
+  } catch (e) { toast('Error de conexión', 'error'); }
+  setLoading(btn, false);
 }
 </script>
 {% endblock %}

@@ -10,14 +10,14 @@
       <option value="todo" {% if period=='todo' %}selected{% endif %}>Histórico (todo)</option>
     </select>
   </form>
-  <a class="btn btn-sm text-white" style="background:#0f766e" href="{{ url_for('ranking_export', period=period) }}">↓ Descargar (.xlsx)</a>
+  <a class="btn btn-sm btn-brand" href="{{ url_for('ranking_export', period=period) }}">↓ Descargar (.xlsx)</a>
 </div>
 
 <div class="row g-3">
   <div class="col-md-6">
-    <div class="card">
-      <div class="card-header fw-bold" style="background:#f2efe8">Laboratorios más pedidos</div>
-      <div class="table-responsive" style="max-height:520px;overflow-y:auto">
+    <div class="tabla-card">
+      <div class="card-header fw-bold">Laboratorios más pedidos</div>
+      <div class="table-responsive card-scroll" style="max-height:520px">
         <table class="table table-sm table-hover mb-0">
           <thead><tr><th style="width:40px">#</th><th>Laboratorio</th><th class="text-end">Unidades</th></tr></thead>
           <tbody>
@@ -32,9 +32,9 @@
     </div>
   </div>
   <div class="col-md-6">
-    <div class="card">
-      <div class="card-header fw-bold" style="background:#f2efe8">Productos más pedidos</div>
-      <div class="table-responsive" style="max-height:520px;overflow-y:auto">
+    <div class="tabla-card">
+      <div class="card-header fw-bold">Productos más pedidos</div>
+      <div class="table-responsive card-scroll" style="max-height:520px">
         <table class="table table-sm table-hover mb-0">
           <thead><tr><th style="width:40px">#</th><th>Producto</th><th>Laboratorio</th><th class="text-end">Unidades</th></tr></thead>
           <tbody>
