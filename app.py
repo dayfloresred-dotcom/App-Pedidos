@@ -596,6 +596,8 @@ def reporte_rotacion():
     import io, openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
     UMBRAL = 2  # 'stock alto' del donante
+    # Sucursales de shopping: dejan 1 unidad de exhibición al donar
+    SHOPPING = {'NUEVO CENTRO', 'LIBERTAD', 'PASEO RIVERA', 'LUGONES', 'SABATTINI'}
     prods = load_productos()
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Rotacion'
     ws.append(['EAN', 'Producto', 'Laboratorio', 'Desde (sucursal)', 'Stock donante',
@@ -608,10 +610,15 @@ def reporte_rotacion():
         recept = [(su, ventas.get(su, 0)) for su in sucs if stock.get(su, 0) == 0 and ventas.get(su, 0) > 0]
         if not donors or not recept:
             continue
-        donors = sorted(donors, key=lambda x: -x[1])
         recept = sorted(recept, key=lambda x: -x[1])
-        avail = [[su, q] for su, q in donors]          # stock disponible mutable
         orig  = {su: q for su, q in donors}            # stock original (para mostrar)
+        # cantidad que puede donar: shopping deja 1 de exhibición
+        donors = [(su, (q - 1 if su in SHOPPING else q)) for su, q in donors]
+        donors = [(su, q) for su, q in donors if q > 0]
+        donors = sorted(donors, key=lambda x: -x[1])
+        if not donors:
+            continue
+        avail = [[su, q] for su, q in donors]          # stock disponible a mover (mutable)
         for rsuc, rneed in recept:
             need = rneed
             for row in avail:
