@@ -1,15 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-<h5 class="mb-3">Nueva solicitud de refuerzo</h5>
+<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+  <h5 class="mb-0">Nueva solicitud de refuerzo</h5>
+  <a id="cart-link" href="#" onclick="irCarrito();return false;" class="btn btn-sm text-white ms-auto" style="background:#166534">
+    🛒 Ver carrito (<span id="count-badge">0</span>)
+  </a>
+</div>
 
 {% if session.get('rol') == 'admin' %}
 <div class="mb-3 d-flex align-items-center gap-2 filter-bar">
   <label class="form-label mb-0 small fw-bold">Crear en nombre de:</label>
-  <select id="sel-sucursal" class="form-select form-select-sm" style="width:220px">
+  <select id="sel-sucursal" class="form-select form-select-sm" style="width:220px" onchange="loadCart()">
     <option value="">— Seleccioná una sucursal —</option>
-    {% for s in sucursales %}
-      <option value="{{ s }}">{{ s }}</option>
-    {% endfor %}
+    {% for s in sucursales %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
   </select>
 </div>
 {% endif %}
@@ -20,9 +23,7 @@
       <label class="form-label small mb-1">Laboratorio</label>
       <input type="text" id="inp-lab" class="form-control form-control-sm" placeholder="Ej: Unilever" list="lab-list" style="width:200px">
       <datalist id="lab-list">
-        {% for lab in laboratorios %}
-          <option value="{{ lab }}">
-        {% endfor %}
+        {% for lab in laboratorios %}<option value="{{ lab }}">{% endfor %}
       </datalist>
     </div>
     <div class="col-auto">
@@ -32,53 +33,56 @@
     <div class="col-auto">
       <button class="btn btn-sm text-white" style="background:#111" onclick="buscar()">Buscar</button>
     </div>
-    <div class="col-auto ms-auto">
-      <button class="btn btn-sm btn-success" onclick="verSolicitud()">
-        Ver solicitud (<span id="count-badge">0</span>)
-      </button>
-    </div>
   </div>
 </div>
 
 <div id="tabla-wrap" class="d-none">
-  <table class="table table-sm table-hover">
-    <thead><tr><th>SKU</th><th>EAN</th><th>Producto</th><th>Laboratorio</th><th class="text-center">Stock real</th><th class="text-center">Stock CD</th><th class="text-center" style="width:100px">Cantidad</th></tr></thead>
+  <div class="table-responsive">
+  <table class="table table-sm table-hover align-middle">
+    <thead><tr>
+      <th>SKU</th><th>EAN</th><th>Producto</th><th>Laboratorio</th>
+      <th class="text-center">Venta</th><th class="text-center">Stock real</th><th class="text-center">Stock CD</th>
+      <th class="text-center" style="width:90px">Cantidad</th><th style="width:200px">Observación</th>
+    </tr></thead>
     <tbody id="tbody"></tbody>
   </table>
-  <p class="text-muted small" id="result-count"></p>
-</div>
-
-<!-- Modal revisión -->
-<div class="modal fade" id="modal-revision" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Revisión de solicitud</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <table class="table table-sm">
-          <thead><tr><th>EAN</th><th>Producto</th><th>Laboratorio</th><th class="text-center">Cantidad</th></tr></thead>
-          <tbody id="tbody-revision"></tbody>
-        </table>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">← Volver a editar</button>
-        <button class="btn btn-sm text-white" style="background:#5a9e6a" onclick="confirmar()">Confirmar solicitud ✓</button>
-      </div>
-    </div>
+  </div>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <p class="text-muted small mb-0" id="result-count"></p>
+    <div class="ms-auto" id="pager"></div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const carrito = {};
 const ROL = '{{ session.get("rol") }}';
+const USER = '{{ session.get("username") }}';
+let allResults = [];
+let page = 1;
+const PER = 50;
+let cartMap = {};   // sku -> {cantidad, observacion}
 
 function getSucursal() {
   if (ROL === 'admin') return document.getElementById('sel-sucursal').value;
-  return '{{ session.get("username") }}';
+  return USER;
+}
+
+async function loadCart() {
+  const suc = getSucursal();
+  if (!suc) { cartMap = {}; document.getElementById('count-badge').textContent = '0'; renderPage(); return; }
+  const res = await fetch('/api/carrito?suc=' + encodeURIComponent(suc));
+  const d = await res.json();
+  cartMap = {};
+  (d.items || []).forEach(it => { cartMap[it.sku] = {cantidad: it.cantidad, observacion: it.observacion || ''}; });
+  document.getElementById('count-badge').textContent = d.n || 0;
+  renderPage();
+}
+
+function irCarrito() {
+  const suc = getSucursal();
+  if (!suc) { alert('Seleccioná una sucursal primero'); return; }
+  window.location = '/carrito?suc=' + encodeURIComponent(suc);
 }
 
 async function buscar() {
@@ -88,66 +92,91 @@ async function buscar() {
   const q   = document.getElementById('inp-q').value;
   if (!lab && !q) { alert('Ingresá laboratorio o nombre de producto'); return; }
   const res  = await fetch(`/api/productos?q=${encodeURIComponent(q)}&lab=${encodeURIComponent(lab)}&suc=${encodeURIComponent(suc)}`);
-  const data = await res.json();
-  renderTabla(data);
+  allResults = await res.json();
+  page = 1;
+  document.getElementById('tabla-wrap').classList.remove('d-none');
+  renderPage();
 }
 
-function renderTabla(prods) {
+function esc(t){ return (t||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;'); }
+
+function renderPage() {
   const tbody = document.getElementById('tbody');
-  tbody.innerHTML = '';
-  prods.slice(0, 200).forEach(p => {
-    const val = carrito[p.sku] ? carrito[p.sku].cantidad : 0;
-    const desc = p.descripcion.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    const lab  = p.laboratorio.replace(/'/g, "\\'");
-    tbody.innerHTML += `<tr>
+  const total = allResults.length;
+  const pages = Math.max(1, Math.ceil(total / PER));
+  if (page > pages) page = pages;
+  const start = (page - 1) * PER;
+  const slice = allResults.slice(start, start + PER);
+  tbody.innerHTML = slice.map(p => {
+    const c = cartMap[p.sku] || {};
+    const val = c.cantidad || 0;
+    const obs = esc(c.observacion || '');
+    return `<tr>
       <td class="text-muted small">${p.sku}</td>
       <td class="text-muted small">${p.ean}</td>
       <td>${p.descripcion}</td>
       <td>${p.laboratorio}</td>
+      <td class="text-center">${p.ventas ?? 0}</td>
       <td class="text-center">${p.stock_real ?? 0}</td>
       <td class="text-center" style="font-weight:600;color:${p.stock_cd==='SI'?'#166534':'#991b1b'}">${p.stock_cd ?? 'NO'}</td>
       <td class="text-center">
-        <input type="number" min="0" class="form-control form-control-sm qty-input"
-          value="${val}"
-          onchange="updateCarrito('${p.sku}','${p.ean}','${desc}','${lab}','${p.drogueria}', this.value)">
+        <input type="number" min="0" class="form-control form-control-sm" value="${val}"
+          onchange="setQty(this, '${p.sku}','${esc(p.ean)}','${esc(p.descripcion)}','${esc(p.laboratorio)}','${esc(p.drogueria)}')">
+      </td>
+      <td>
+        <input type="text" class="form-control form-control-sm" placeholder="opcional" value="${obs}"
+          onchange="setObs('${p.sku}', this.value)">
       </td>
     </tr>`;
-  });
-  document.getElementById('tabla-wrap').classList.remove('d-none');
-  document.getElementById('result-count').textContent = `${prods.length} productos encontrados`;
+  }).join('');
+  document.getElementById('result-count').textContent = `${total} productos · página ${page} de ${pages}`;
+  renderPager(pages);
 }
 
-function updateCarrito(sku, ean, desc, lab, drog, val) {
-  const n = parseInt(val) || 0;
-  if (n > 0) carrito[sku] = {sku, ean, descripcion: desc, laboratorio: lab, drogueria: drog, cantidad: n};
-  else delete carrito[sku];
-  document.getElementById('count-badge').textContent = Object.keys(carrito).length;
+function renderPager(pages) {
+  const el = document.getElementById('pager');
+  if (pages <= 1) { el.innerHTML = ''; return; }
+  let html = '<div class="btn-group btn-group-sm">';
+  html += `<button class="btn btn-outline-secondary" ${page<=1?'disabled':''} onclick="goPage(${page-1})">‹</button>`;
+  const from = Math.max(1, page-2), to = Math.min(pages, page+2);
+  if (from > 1) html += `<button class="btn btn-outline-secondary" onclick="goPage(1)">1</button>`;
+  for (let i=from; i<=to; i++)
+    html += `<button class="btn ${i===page?'btn-dark':'btn-outline-secondary'}" onclick="goPage(${i})">${i}</button>`;
+  if (to < pages) html += `<button class="btn btn-outline-secondary" onclick="goPage(${pages})">${pages}</button>`;
+  html += `<button class="btn btn-outline-secondary" ${page>=pages?'disabled':''} onclick="goPage(${page+1})">›</button>`;
+  html += '</div>';
+  el.innerHTML = html;
 }
+function goPage(p){ page = p; renderPage(); window.scrollTo(0,0); }
 
-function verSolicitud() {
-  const items = Object.values(carrito);
-  if (!items.length) { alert('No agregaste ningún producto'); return; }
-  const tbody = document.getElementById('tbody-revision');
-  tbody.innerHTML = items.map(it =>
-    `<tr><td class="small text-muted">${it.ean}</td><td>${it.descripcion}</td><td>${it.laboratorio}</td><td class="text-center fw-bold">${it.cantidad}</td></tr>`
-  ).join('');
-  new bootstrap.Modal(document.getElementById('modal-revision')).show();
-}
-
-async function confirmar() {
+async function setQty(inp, sku, ean, desc, lab, drog) {
   const suc = getSucursal();
-  if (!suc) { alert('Seleccioná una sucursal'); return; }
-  const items = Object.values(carrito);
-  const res = await fetch('/api/solicitud', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({sucursal: suc, items})
+  if (!suc) { alert('Seleccioná una sucursal'); inp.value=0; return; }
+  const cant = parseInt(inp.value, 10) || 0;
+  const obs = (cartMap[sku] && cartMap[sku].observacion) || '';
+  const res = await fetch('/api/carrito/set', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({sucursal: suc, sku, ean, descripcion: desc, laboratorio: lab, drogueria: drog, cantidad: cant, observacion: obs})
   });
-  const data = await res.json();
-  if (data.sol_id) window.location = `/confirmado/${data.sol_id}`;
-  else alert('Error al guardar: ' + (data.error || 'desconocido'));
+  const d = await res.json().catch(()=>({}));
+  if (res.ok) {
+    if (cant > 0) cartMap[sku] = {cantidad: cant, observacion: obs};
+    else delete cartMap[sku];
+    document.getElementById('count-badge').textContent = d.n ?? Object.keys(cartMap).length;
+  } else alert(d.error || 'No se pudo guardar.');
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Enter') buscar(); });
+async function setObs(sku, obs) {
+  const suc = getSucursal();
+  if (!suc || !cartMap[sku]) return;  // solo si ya está en el carrito (cantidad>0)
+  cartMap[sku].observacion = obs;
+  await fetch('/api/carrito/obs', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({sucursal: suc, sku, observacion: obs})
+  });
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.id==='inp-lab' || e.target.id==='inp-q')) buscar(); });
+window.addEventListener('DOMContentLoaded', loadCart);
 </script>
 {% endblock %}

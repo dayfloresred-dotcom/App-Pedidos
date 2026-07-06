@@ -52,6 +52,22 @@ def init_db():
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN cancelado INTEGER NOT NULL DEFAULT 0")
     if 'comprado' not in cols:
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN comprado INTEGER NOT NULL DEFAULT 0")
+    if 'observacion' not in cols:
+        conn.execute("ALTER TABLE items_solicitud ADD COLUMN observacion TEXT")
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS carrito (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            sucursal    TEXT NOT NULL,
+            sku         TEXT NOT NULL,
+            ean         TEXT,
+            descripcion TEXT,
+            laboratorio TEXT,
+            drogueria   TEXT,
+            cantidad    INTEGER NOT NULL,
+            observacion TEXT,
+            UNIQUE(sucursal, sku)
+        )
+    ''')
     conn.execute('''
         CREATE TABLE IF NOT EXISTS envios (
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,8 +108,8 @@ def crear_solicitud(sucursal, creado_por, items):
     sol_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
     for it in items:
         conn.execute(
-            'INSERT INTO items_solicitud (solicitud_id, sku, ean, descripcion, laboratorio, cantidad, drogueria) VALUES (?,?,?,?,?,?,?)',
-            (sol_id, it['sku'], it.get('ean',''), it['descripcion'], it.get('laboratorio',''), it['cantidad'], it.get('drogueria',''))
+            'INSERT INTO items_solicitud (solicitud_id, sku, ean, descripcion, laboratorio, cantidad, drogueria, observacion) VALUES (?,?,?,?,?,?,?,?)',
+            (sol_id, it['sku'], it.get('ean',''), it['descripcion'], it.get('laboratorio',''), it['cantidad'], it.get('drogueria',''), it.get('observacion') or None)
         )
     conn.commit()
     conn.close()
@@ -172,7 +188,8 @@ def get_items_detalle(sku):
         SELECT s.sucursal,
                SUM(i.cantidad)        as cantidad,
                MIN(i.ordenado)        as ordenado,
-               MAX(i.drogueria_final) as drogueria_final
+               MAX(i.drogueria_final) as drogueria_final,
+               MAX(i.observacion)     as observacion
         FROM items_solicitud i
         JOIN solicitudes s ON s.id = i.solicitud_id
         WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0 AND i.comprado=0
@@ -476,6 +493,39 @@ def get_omitidos_sucursal(sucursal):
     for r in rows:
         out.setdefault(r['sku'], set()).add(r['drogueria'])
     return out
+
+def carrito_set(sucursal, sku, ean, desc, lab, drog, cantidad, observacion=None):
+    conn = get_db()
+    try: c = int(cantidad)
+    except (TypeError, ValueError): c = 0
+    if c > 0:
+        conn.execute("""INSERT INTO carrito (sucursal, sku, ean, descripcion, laboratorio, drogueria, cantidad, observacion)
+            VALUES (?,?,?,?,?,?,?,?)
+            ON CONFLICT(sucursal, sku) DO UPDATE SET cantidad=excluded.cantidad, ean=excluded.ean,
+              descripcion=excluded.descripcion, laboratorio=excluded.laboratorio, drogueria=excluded.drogueria""",
+            (sucursal, sku, ean, desc, lab, drog, c, observacion))
+    else:
+        conn.execute("DELETE FROM carrito WHERE sucursal=? AND sku=?", (sucursal, sku))
+    conn.commit()
+    conn.close()
+
+def carrito_set_obs(sucursal, sku, obs):
+    conn = get_db()
+    conn.execute("UPDATE carrito SET observacion=? WHERE sucursal=? AND sku=?", (obs, sucursal, sku))
+    conn.commit()
+    conn.close()
+
+def get_carrito(sucursal):
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM carrito WHERE sucursal=? ORDER BY id", (sucursal,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def carrito_clear(sucursal):
+    conn = get_db()
+    conn.execute("DELETE FROM carrito WHERE sucursal=?", (sucursal,))
+    conn.commit()
+    conn.close()
 
 def cancelar_solicitud(sol_id):
     conn = get_db()

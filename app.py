@@ -10,7 +10,8 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        marcar_comprado_drogueria, marcar_inexistente,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
                        get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item,
-                       actualizar_comprado_por_envio)
+                       actualizar_comprado_por_envio,
+                       carrito_set, carrito_set_obs, get_carrito, carrito_clear)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -214,6 +215,7 @@ def api_productos():
         'descripcion': p['descripcion'],
         'laboratorio': p['laboratorio'],
         'drogueria':   p['drogueria'],
+        'ventas':      p['ventas'].get(suc, 0) if suc and suc != 'admin' else 0,
         'stock_real':  p['stock_real'].get(suc, 0) if suc and suc != 'admin' else 0,
         'stock_cd':    'SI' if (p.get('stock_cd') or 0) not in (0, '', 'NO') else 'NO',
     } for p in results])
@@ -229,6 +231,63 @@ def api_crear_solicitud():
     numero, sol_id = crear_solicitud(sucursal, session['username'], items)
     enviar_notificacion(numero, sucursal, items)
     return jsonify({'numero': numero, 'sol_id': sol_id})
+
+@app.route('/api/carrito', methods=['GET'])
+@login_required
+def api_carrito_get():
+    suc = request.args.get('suc', '') or session.get('username', '')
+    items = get_carrito(suc)
+    return jsonify({'items': items, 'n': len(items)})
+
+@app.route('/api/carrito/set', methods=['POST'])
+@login_required
+def api_carrito_set():
+    d = request.get_json(silent=True) or {}
+    suc = (d.get('sucursal') or session.get('username') or '').strip()
+    if not suc:
+        return jsonify({'error': 'Falta sucursal'}), 400
+    carrito_set(suc, str(d.get('sku')), d.get('ean', ''), d.get('descripcion', ''),
+                d.get('laboratorio', ''), d.get('drogueria', ''), d.get('cantidad', 0), d.get('observacion'))
+    return jsonify({'ok': True, 'n': len(get_carrito(suc))})
+
+@app.route('/api/carrito/obs', methods=['POST'])
+@login_required
+def api_carrito_obs():
+    d = request.get_json(silent=True) or {}
+    suc = (d.get('sucursal') or session.get('username') or '').strip()
+    carrito_set_obs(suc, str(d.get('sku')), d.get('observacion') or None)
+    return jsonify({'ok': True})
+
+@app.route('/api/carrito/clear', methods=['POST'])
+@login_required
+def api_carrito_clear():
+    d = request.get_json(silent=True) or {}
+    suc = (d.get('sucursal') or session.get('username') or '').strip()
+    carrito_clear(suc)
+    return jsonify({'ok': True})
+
+@app.route('/api/carrito/confirmar', methods=['POST'])
+@login_required
+def api_carrito_confirmar():
+    d = request.get_json(silent=True) or {}
+    suc = (d.get('sucursal') or session.get('username') or '').strip()
+    if not suc:
+        return jsonify({'error': 'Falta sucursal'}), 400
+    items = get_carrito(suc)
+    if not items:
+        return jsonify({'error': 'El carrito está vacío'}), 400
+    numero, sol_id = crear_solicitud(suc, session['username'], items)
+    enviar_notificacion(numero, suc, items)
+    carrito_clear(suc)
+    return jsonify({'ok': True, 'sol_id': sol_id, 'numero': numero})
+
+@app.route('/carrito')
+@login_required
+def carrito():
+    suc = request.args.get('suc', '') or session.get('username', '')
+    items = get_carrito(suc)
+    total = sum(i['cantidad'] for i in items)
+    return render_template('carrito.html', items=items, sucursal=suc, total=total)
 
 @app.route('/api/detalle-sucursal')
 @login_required

@@ -42,7 +42,7 @@
         {% for it in items %}
         <tr {% if it.cancelado %}style="opacity:.6"{% endif %}>
           <td class="text-muted small">{{ it.ean }}</td>
-          <td>{{ it.descripcion }}</td>
+          <td>{{ it.descripcion }}{% if it.observacion %}<div class="small fst-italic" style="color:#9a3412">📝 {{ it.observacion }}</div>{% endif %}</td>
           <td>{{ it.laboratorio }}</td>
           <td class="text-center fw-bold">{{ it.cantidad }}</td>
           <td class="text-center">

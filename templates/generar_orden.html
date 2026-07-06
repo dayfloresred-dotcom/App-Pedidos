@@ -98,6 +98,7 @@
                     <div class="d-flex align-items-center gap-2 border rounded px-2 py-1" style="background:#fff">
                       <span class="small fw-bold">{{ d.sucursal }}</span>
                       <span class="small text-muted">de {{ d.cantidad }}</span>
+                      {% if d.observacion %}<span title="{{ d.observacion }}" style="cursor:help">📝</span>{% endif %}
                       {% if it.drog_code %}
                       <input type="number" min="0" value="{{ d.cantidad }}" style="width:52px"
                         class="form-control form-control-sm env-input"
