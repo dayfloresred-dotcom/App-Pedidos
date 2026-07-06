@@ -680,12 +680,31 @@ def reporte_rotacion():
     # Sucursales de shopping: dejan 1 unidad de exhibición al donar
     SHOPPING = {'NUEVO CENTRO', 'LIBERTAD', 'PASEO RIVERA', 'LUGONES', 'SABATTINI'}
     prods = load_productos()
+
+    def _es_60d(lab):
+        L = (lab or '').upper()
+        return 'EATWELL' in L or 'BIO SALUD' in L or 'BIOSALUD' in L
+
+    # Ventas para rotación: 90 días (60 días para Eatwell y Bio Salud). Vienen de Plex.
+    ventas90 = ventas60 = None
+    try:
+        import fuentes_plex
+        if fuentes_plex.configurada():
+            ventas90 = fuentes_plex.cargar_ventas(90)
+            ventas60 = fuentes_plex.cargar_ventas(60)
+    except Exception as e:
+        print('[ROT] No se pudieron traer ventas 90/60 de Plex; uso ventas actuales:', e)
+        ventas90 = ventas60 = None
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Rotacion'
     ws.append(['EAN', 'Producto', 'Laboratorio', 'Desde (sucursal)', 'Stock donante',
                'Hacia (sucursal)', 'Ventas receptor', 'Cantidad a mover'])
     for p in prods:
         stock  = p.get('stock_real', {}) or {}
-        ventas = p.get('ventas', {}) or {}
+        if ventas90 is not None:
+            fuente = ventas60 if _es_60d(p.get('laboratorio')) else ventas90
+            ventas = fuente.get(str(p.get('sku')), {}) or {}
+        else:
+            ventas = p.get('ventas', {}) or {}
         sucs = set(stock) | set(ventas)
         donors = [(su, stock.get(su, 0)) for su in sucs if stock.get(su, 0) >= UMBRAL and ventas.get(su, 0) == 0]
         recept = [(su, ventas.get(su, 0)) for su in sucs if stock.get(su, 0) == 0 and ventas.get(su, 0) > 0]

@@ -125,6 +125,28 @@ def transformar(rows_prod, rows_eans, rows_ventas, rows_stock):
     }
 
 
+def cargar_ventas(dias):
+    """Ventas por (sku, sucursal) de los ultimos `dias` dias.
+    Devuelve {sku: {sucursal_nombre: unidades}}. Para el reporte de rotacion."""
+    desde = (date.today() - timedelta(days=int(dias))).isoformat()
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(Q_VENTAS, (desde,))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    out = {}
+    for r in rows:
+        nombre = _nombre_sucursal(r['sucursal'])
+        if not nombre:
+            continue
+        sku = str(r['sku'])
+        out.setdefault(sku, {})
+        out[sku][nombre] = out[sku].get(nombre, 0) + int(r['unidades'] or 0)
+    return out
+
+
 def cargar():
     desde = (date.today() - timedelta(days=VENTAS_VENTANA_DIAS)).isoformat()
     conn = _conn()
