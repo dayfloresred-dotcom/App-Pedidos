@@ -4,10 +4,32 @@ fijo y hora local de archivos. El código llegó por merge sin tests — estos
 lo caracterizan para que la integración no lo rompa."""
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from config import local_from_ts, now_local
-from database import (init_db, crear_solicitud, get_solicitud_detalle, get_ranking,
-                      carrito_set, carrito_set_obs, get_carrito, carrito_clear)
+from database import (init_db, get_db, crear_solicitud, get_solicitud_detalle,
+                      get_ranking, carrito_set, carrito_set_obs, get_carrito,
+                      carrito_clear)
 from export_service import generar_sud
+
+
+@pytest.fixture()
+def db_limpia():
+    """Borra las solicitudes creadas por el test (la DB es compartida entre
+    tests y una pendiente residual rompe los asserts de estados vacíos)."""
+    init_db()
+    conn = get_db()
+    antes = {r['id'] for r in conn.execute('SELECT id FROM solicitudes')}
+    conn.close()
+    yield
+    conn = get_db()
+    nuevas = [r['id'] for r in conn.execute('SELECT id FROM solicitudes')
+              if r['id'] not in antes]
+    for sol_id in nuevas:
+        conn.execute('DELETE FROM items_solicitud WHERE solicitud_id=?', (sol_id,))
+        conn.execute('DELETE FROM solicitudes WHERE id=?', (sol_id,))
+    conn.commit()
+    conn.close()
 
 
 def test_carrito_set_get_actualizar_y_borrar_en_cero():
@@ -30,8 +52,7 @@ def test_carrito_set_get_actualizar_y_borrar_en_cero():
     assert get_carrito('CERRO') == []
 
 
-def test_carrito_obs_y_confirmar_persiste_observacion():
-    init_db()
+def test_carrito_obs_y_confirmar_persiste_observacion(db_limpia):
     carrito_clear('RECTA')
     carrito_set('RECTA', '333', '779000000003', 'PRODUCTO C', 'LAB Z', 'CD', 2)
     carrito_set_obs('RECTA', '333', 'vence 08/26')
@@ -43,8 +64,7 @@ def test_carrito_obs_y_confirmar_persiste_observacion():
     carrito_clear('RECTA')
 
 
-def test_get_ranking_periodos_y_laboratorio():
-    init_db()
+def test_get_ranking_periodos_y_laboratorio(db_limpia):
     hoy = now_local().strftime('%d/%m/%Y %H:%M')
     crear_solicitud('URCA', 'URCA', [
         {'sku': '901', 'descripcion': 'RANK UNO', 'laboratorio': 'LAB RANK', 'cantidad': 7},
