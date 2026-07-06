@@ -78,6 +78,12 @@ def init_db():
             UNIQUE(sucursal, sku, drogueria)
         )
     ''')
+    # Migración: auditoría de envíos (quién y cuándo; filas viejas quedan NULL)
+    cols_env = {r['name'] for r in conn.execute("PRAGMA table_info(envios)").fetchall()}
+    if 'fecha' not in cols_env:
+        conn.execute("ALTER TABLE envios ADD COLUMN fecha TEXT")
+    if 'usuario' not in cols_env:
+        conn.execute("ALTER TABLE envios ADD COLUMN usuario TEXT")
     conn.execute('''
         CREATE TABLE IF NOT EXISTS omitidos (
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -416,17 +422,21 @@ def marcar_inexistente(sku):
     conn.commit()
     conn.close()
 
-def registrar_envio(sucursal, sku, drogueria, cantidad):
-    """Registra (o actualiza) cuántas unidades se envían de un producto a una sucursal desde una droguería."""
+def registrar_envio(sucursal, sku, drogueria, cantidad, usuario=None):
+    """Registra (o actualiza) cuántas unidades se envían de un producto a una
+    sucursal desde una droguería, con fecha y usuario para auditoría."""
     conn = get_db()
     try:
         cant = int(cantidad)
     except (TypeError, ValueError):
         cant = 0
     if cant > 0:
-        conn.execute('''INSERT INTO envios (sucursal, sku, drogueria, cantidad) VALUES (?,?,?,?)
-            ON CONFLICT(sucursal, sku, drogueria) DO UPDATE SET cantidad=excluded.cantidad''',
-            (sucursal, sku, drogueria, cant))
+        fecha = now_local().strftime('%d/%m/%Y %H:%M')
+        conn.execute('''INSERT INTO envios (sucursal, sku, drogueria, cantidad, fecha, usuario)
+            VALUES (?,?,?,?,?,?)
+            ON CONFLICT(sucursal, sku, drogueria) DO UPDATE SET
+              cantidad=excluded.cantidad, fecha=excluded.fecha, usuario=excluded.usuario''',
+            (sucursal, sku, drogueria, cant, fecha, usuario))
     else:
         conn.execute("DELETE FROM envios WHERE sucursal=? AND sku=? AND drogueria=?", (sucursal, sku, drogueria))
     conn.commit()

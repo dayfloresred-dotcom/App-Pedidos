@@ -471,7 +471,7 @@ def api_enviar():
         cant = 0
     if not (sku and suc and drog):
         return jsonify({'error': 'Faltan datos'}), 400
-    registrar_envio(suc, sku, drog, cant)
+    registrar_envio(suc, sku, drog, cant, usuario=session.get('username'))
     if cant > 0:
         marcar_item_generado(sku, suc, drog, now_local().strftime('%d/%m/%Y'))
     actualizar_comprado_por_envio(suc, sku)
@@ -559,7 +559,7 @@ def api_rotacion():
         cant = 0
     if not (sku and suc):
         return jsonify({'error': 'Faltan datos'}), 400
-    registrar_envio(suc, sku, 'ROT', cant)
+    registrar_envio(suc, sku, 'ROT', cant, usuario=session.get('username'))
     if cant > 0:
         marcar_item_generado(sku, suc, 'ROT', now_local().strftime('%d/%m/%Y'))
     actualizar_comprado_por_envio(suc, sku)
