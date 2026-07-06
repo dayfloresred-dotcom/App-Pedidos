@@ -26,7 +26,7 @@
   <tbody>
     {% for s in solicitudes %}
     <tr>
-      <td><a href="{{ url_for('ver_solicitud', sol_id=s.id) }}" class="sol-number">{{ s.numero }}</a></td>
+      <td><a href="{{ url_for('ver_solicitud', sol_id=s.id, suc=filtro_suc) }}" class="sol-number">{{ s.numero }}</a></td>
       {% if session.get('rol') == 'admin' %}<td>{{ s.sucursal }}</td>{% endif %}
       <td>{{ s.fecha_solicitud }}</td>
       <td class="text-muted">{{ s.n_items }} prod.</td>

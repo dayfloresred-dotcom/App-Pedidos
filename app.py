@@ -72,7 +72,8 @@ def ver_solicitud(sol_id):
         flash('Solicitud no encontrada', 'danger')
         return redirect(url_for('mis_pedidos'))
     envios = get_envios_sucursal(sol['sucursal'])
-    return render_template('confirmado.html', sol=sol, items=items, envios=envios)
+    return render_template('confirmado.html', sol=sol, items=items, envios=envios,
+        filtro_suc=request.args.get('suc', ''))
 
 @app.route('/solicitud/<int:sol_id>/cancelar', methods=['POST'])
 @login_required

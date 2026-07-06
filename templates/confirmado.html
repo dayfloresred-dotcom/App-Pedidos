@@ -13,7 +13,7 @@
       <div class="col-4">
         <div class="bg-light rounded p-3">
           <div class="small text-muted">Número de pedido</div>
-          <div class="sol-number fs-5">{{ sol.numero }}</div>
+          <div class="sol-number fs-5">{{ sol.numero }} <span class="fs-6 text-dark">· {{ sol.sucursal }}</span></div>
         </div>
       </div>
       <div class="col-4">
@@ -101,7 +101,7 @@
       </div>
       <div>
         <a href="{{ url_for('nueva_solicitud') }}" class="btn btn-sm btn-outline-secondary">← Nueva solicitud</a>
-        <a href="{{ url_for('mis_pedidos') }}" class="btn btn-sm btn-outline-primary ms-2">Ver mis pedidos</a>
+        <a href="{{ url_for('mis_pedidos', suc=filtro_suc) }}" class="btn btn-sm btn-outline-primary ms-2">Ver mis pedidos</a>
       </div>
     </div>
   </div>
