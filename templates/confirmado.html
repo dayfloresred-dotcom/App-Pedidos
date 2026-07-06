@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-md-8">
+  <div class="col-12">
     <div class="alert alert-success d-flex align-items-center gap-3 mb-4">
       <span style="font-size:2rem">✓</span>
       <div>
@@ -13,7 +13,7 @@
       <div class="col-4">
         <div class="metric-card">
           <div class="metric-label">Número de pedido</div>
-          <div class="metric-valor sol-number">{{ sol.numero }}</div>
+          <div class="metric-valor sol-number">{{ sol.numero }} <span class="fs-6 text-muted">· {{ sol.sucursal }}</span></div>
         </div>
       </div>
       <div class="col-4">
@@ -43,7 +43,7 @@
       </div>
       <div>
         <a href="{{ url_for('nueva_solicitud') }}" class="btn btn-sm btn-outline-secondary">← Nueva solicitud</a>
-        <a href="{{ url_for('mis_pedidos') }}" class="btn btn-sm btn-outline-primary ms-2">Ver mis pedidos</a>
+        <a href="{{ url_for('mis_pedidos', suc=filtro_suc) }}" class="btn btn-sm btn-outline-primary ms-2">Ver mis pedidos</a>
       </div>
     </div>
   </div>

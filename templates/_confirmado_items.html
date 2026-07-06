@@ -1,6 +1,7 @@
 {% set ORIGEN = {'CD':'Centro de Distribución','SUD':'Droguería Sud','SUIZO':'Droguería Suizo','ROT':'Rotación','INEXISTENTE':'Producto inexistente'} %}
 {% set ENVLBL = {'CD':'CD','SUD':'Sud','SUIZO':'Suizo','ROT':'Rotación'} %}
 {% set ORIGEN_BADGE = {'CD':'badge-cd','SUD':'badge-sud','SUIZO':'badge-suizo','ROT':'badge-rot','INEXISTENTE':'badge-cancelado'} %}
+<div class="table-responsive">
 <table class="table table-sm">
   <thead><tr>
     <th>EAN</th><th>Producto</th><th>Laboratorio</th>
@@ -11,7 +12,7 @@
     {% for it in items %}
     <tr {% if it.cancelado %}style="opacity:.6"{% endif %}>
       <td class="text-muted small">{{ it.ean }}</td>
-      <td>{{ it.descripcion }}</td>
+      <td>{{ it.descripcion }}{% if it.observacion %}<div class="small fst-italic" style="color:#9a3412">📝 {{ it.observacion }}</div>{% endif %}</td>
       <td>{{ it.laboratorio }}</td>
       <td class="text-center fw-bold">{{ it.cantidad }}</td>
       <td class="text-center">
@@ -58,3 +59,4 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
