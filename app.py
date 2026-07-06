@@ -77,6 +77,7 @@ def mis_pedidos():
 @login_required
 def ver_solicitud(sol_id):
     sol, items = get_solicitud_detalle(sol_id)
+    items = sorted(items, key=lambda i: (i.get('descripcion') or '').upper())
     if not sol:
         flash('Solicitud no encontrada', 'danger')
         return redirect(url_for('mis_pedidos'))
@@ -88,6 +89,7 @@ def ver_solicitud(sol_id):
 @login_required
 def ver_solicitud_fragmento(sol_id):
     sol, items = get_solicitud_detalle(sol_id)
+    items = sorted(items, key=lambda i: (i.get('descripcion') or '').upper())
     if not sol:
         return 'No encontrada', 404
     if session.get('rol') != 'admin' and sol['sucursal'] != session.get('username'):
@@ -204,6 +206,19 @@ def _armar_orden(filtro_suc):
             out.append(d)
         return out
 
+    def chips_de(vis):
+        sucs = sorted({d['sucursal'] for d in vis})
+        html = ' '.join(f'<span class="chip-suc">{sname}</span>' for sname in sucs[:3])
+        if len(sucs) > 3:
+            html += f' <span class="chip-suc">+{len(sucs)-3}</span>'
+        return html
+
+    def item_card(base_item, vis, code, es_overflow):
+        # total y sucursales SOLO de lo pendiente (visible) en esta tarjeta
+        return {**base_item, 'es_overflow': es_overflow, 'detalle_suc': vis,
+                'drog_code': code, 'total': sum(d['cantidad'] for d in vis),
+                'sucursales_str': chips_de(vis)}
+
     for p in prods:
         sku = p['sku']
         suc_list = [s.strip() for s in (p.get('sucursales') or '').split(',') if s.strip()]
@@ -228,22 +243,19 @@ def _armar_orden(filtro_suc):
         if drog == 'DROGUERIA RED':
             vis_cd = visibles(detalle, sku, 'CD')
             if vis_cd:
-                orden['DROGUERIA RED'].append({**base_item, 'es_overflow': False,
-                    'detalle_suc': vis_cd, 'drog_code': 'CD'})
-            overflow = p['total'] - stock_cd
-            if overflow > 0 and drog_ext in ('SUD', 'SUIZO'):
+                orden['DROGUERIA RED'].append(item_card(base_item, vis_cd, 'CD', False))
+            if drog_ext in ('SUD', 'SUIZO') and (p['total'] - stock_cd) > 0:
                 vis_ext = visibles(detalle, sku, drog_ext)
                 if vis_ext:
-                    orden[drog_ext].append({**base_item, 'total': overflow, 'es_overflow': True,
-                        'detalle_suc': vis_ext, 'drog_code': drog_ext})
+                    orden[drog_ext].append(item_card(base_item, vis_ext, drog_ext, True))
         elif drog in ('SUD', 'SUIZO'):
             vis = visibles(detalle, sku, drog)
             if vis:
-                orden[drog].append({**base_item, 'es_overflow': False,
-                    'detalle_suc': vis, 'drog_code': drog})
+                orden[drog].append(item_card(base_item, vis, drog, False))
         else:
             orden['SIN_PRECIO'].append({**base_item, 'es_overflow': False,
-                'detalle_suc': detalle, 'drog_code': ''})
+                'detalle_suc': detalle, 'drog_code': '',
+                'sucursales_str': chips_de(detalle)})
 
     conn = get_db()
     sucs_set = {r['sucursal'] for r in conn.execute(
@@ -255,6 +267,8 @@ def _armar_orden(filtro_suc):
                 sucs_set.add(d['sucursal'])
     sucs_orden = sorted(sucs_set)
 
+    for k in orden:
+        orden[k].sort(key=lambda it: (it.get('descripcion') or '').upper())
     return {k: v for k, v in orden.items() if v}, sucs_orden
 
 

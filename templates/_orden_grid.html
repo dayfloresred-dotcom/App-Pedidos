@@ -21,7 +21,7 @@
             {% for it in items %}
             {% set rid = (drog ~ '_' ~ it.sku)|replace(' ', '') %}
             {% set tot = it.detalle_suc|length %}
-            <tr>
+            <tr class="prod-row" data-rid="{{ rid }}" data-buscar="{{ (it.descripcion ~ ' ' ~ it.ean)|lower }}">
               <td class="text-muted small" style="font-size:11px">{{ it.ean[:13] }}</td>
               <td style="font-size:12px">
                 {% if tot > 0 %}

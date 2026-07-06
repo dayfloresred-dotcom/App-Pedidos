@@ -11,6 +11,8 @@
     </select>
     {% if filtro_suc %}<a href="{{ url_for('generar_orden') }}" class="btn btn-sm btn-outline-secondary">✕</a>{% endif %}
   </form>
+  <input id="buscar-orden" type="text" class="form-control form-control-sm" style="width:230px"
+    placeholder="Buscar por nombre o EAN" oninput="filtrarOrden(this.value)">
   <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
     {% if sucs_orden %}
     <span class="small text-muted">Exportar pedido de:</span>
@@ -33,6 +35,16 @@
 {% endblock %}
 {% block scripts %}
 <script>
+function filtrarOrden(q) {
+  const t = (q || '').trim().toLowerCase();
+  document.querySelectorAll('#orden-grid tr.prod-row').forEach(row => {
+    const ok = !t || (row.dataset.buscar || '').includes(t);
+    row.style.display = ok ? '' : 'none';
+    const det = document.querySelector('.detalle-' + CSS.escape(row.dataset.rid));
+    if (det && !ok) det.style.display = 'none';
+  });
+}
+
 function toggleDet(rid, btn) {
   const row = document.querySelector('.detalle-' + CSS.escape(rid));
   if (!row) return;
@@ -69,6 +81,8 @@ async function refrescarOrden() {
     if (scrolls[i] !== undefined) b.scrollTop = scrolls[i];
   });
   window.scrollTo(0, scrollY);
+  const bq = document.getElementById('buscar-orden');
+  if (bq && bq.value) filtrarOrden(bq.value);
 }
 
 async function descargar(url, payload, fallbackName) {
