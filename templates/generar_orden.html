@@ -17,7 +17,7 @@
     {% if sucs_orden %}
     <span class="small text-muted">Exportar pedido de:</span>
     <select id="export-suc" class="form-select form-select-sm" style="width:auto">
-      {% for s in sucs_orden %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      {% for s in sucs_orden %}<option value="{{ s }}" {% if s == filtro_suc %}selected{% endif %}>{{ s }}</option>{% endfor %}
     </select>
     <button class="btn btn-sm btn-suave"
       onclick="exportPedido('CD')">↓ Quantio (CD)</button>
