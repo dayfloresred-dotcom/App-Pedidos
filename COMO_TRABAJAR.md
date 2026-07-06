@@ -24,20 +24,23 @@ Somos dos (o más) trabajando sobre el mismo repositorio de GitHub
 
 ## Deploy (publicar en producción)
 
-- Producción se está mudando de **PythonAnywhere** al **VPS** (Docker),
-  en `pedidos.farmaciasred.com`.
-- En el VPS el deploy es: `git pull` dentro de `/opt/App-Pedidos` + reinicio del
+- Producción es **solo el VPS** (Docker): `pedidos.farmaciasred.com`.
+  El cutover se completó el 06/07/2026; PythonAnywhere quedó como redirect
+  a la URL nueva (expira el 03/08/2026).
+- El deploy es: `git pull` dentro de `/opt/App-Pedidos` + rebuild del
   contenedor. Eso lo maneja quien tenga acceso SSH (coordinar con Ezequiel).
-- Mientras siga PythonAnywhere: `cd App-Pedidos && git pull` → pestaña **Web** → **Reload**.
+  Detalle completo en `docs/2026-07-02-migracion-vps.md`.
 
 ## Si aparece un conflicto
 - Si GitHub Desktop dice que no puede hacer *Pull/Push* por cambios encontrados,
   **no toques nada** y pedí ayuda (Claude o el otro colaborador) para resolverlo.
 
 ## Pendiente de seguridad (importante)
-- Rotar la contraseña de aplicación de Gmail (quedó expuesta en el historial del
-  repo) y cargar las variables de entorno (`MAIL_*`, `SECRET_KEY`) en el VPS.
-  Sin esto no salen los mails y las sesiones se caen en cada reinicio.
+- Las variables (`MAIL_*`, `SECRET_KEY`) ya están cargadas en el VPS y los
+  mails salen (configurado 06/07/2026). Falta SOLO rotar la contraseña de
+  aplicación de Gmail (quedó expuesta en el historial del repo): generar una
+  nueva en la cuenta de Gmail, revocar la vieja y pasarle el valor nuevo a
+  Ezequiel para actualizar el `.env` del VPS.
 
 ## Cosas que NO se suben al repo (ya ignoradas)
 - `pedidos.db` (base de datos), `*.pkl` (cache), archivos de datos subidos.
