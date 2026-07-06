@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+  <h5 class="mb-0">Cumplimiento</h5>
+  <form method="get" class="d-flex align-items-center gap-1">
+    <span class="small text-muted">Período:</span>
+    <select name="periodo" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <option value="30" {% if periodo=='30' %}selected{% endif %}>Últimos 30 días</option>
+      <option value="todo" {% if periodo=='todo' %}selected{% endif %}>Histórico (todo)</option>
+    </select>
+  </form>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="metric-card">
+      <div class="metric-label">Solicitudes</div>
+      <div class="metric-valor">{{ g.solicitudes }}</div>
+      <div class="small text-muted">{{ g.canceladas }} canceladas</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="metric-card">
+      <div class="metric-label">Compradas</div>
+      <div class="metric-valor">{{ g.pct_compradas }}%</div>
+      <div class="small text-muted">{{ g.compradas }} de {{ g.solicitudes - g.canceladas }} activas</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="metric-card">
+      <div class="metric-label">Días solicitud → compra</div>
+      <div class="metric-valor">{{ g.dias_promedio_compra if g.dias_promedio_compra is not none else '—' }}</div>
+      <div class="small text-muted">promedio del período</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="metric-card">
+      <div class="metric-label">Pendientes</div>
+      <div class="metric-valor">{{ g.pendientes }}</div>
+      <div class="small text-muted">solicitudes sin comprar</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="tabla-card">
+      <div class="card-header fw-bold">Cobertura por sucursal <span class="fw-normal small text-muted">(unidades del período)</span></div>
+      <div class="table-responsive card-scroll" style="max-height:480px">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Sucursal</th><th class="text-end">Pedido</th><th class="text-end">Atendido</th><th class="text-end">Pendiente</th><th class="text-end">Cobertura</th></tr></thead>
+          <tbody>
+            {% for s in por_sucursal %}
+            <tr>
+              <td>{{ s.sucursal }}</td>
+              <td class="text-end">{{ s.pedido_u }}</td>
+              <td class="text-end">{{ s.atendido_u }}</td>
+              <td class="text-end">{{ s.pendiente_u }}</td>
+              <td class="text-end fw-bold {% if s.pct < 50 %}text-danger{% elif s.pct < 80 %}text-warning{% else %}text-success{% endif %}">{{ s.pct }}%</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-4">Sin pedidos en este período</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="tabla-card">
+      <div class="card-header fw-bold">Productos demorados <span class="fw-normal small text-muted">(pendientes sin procesar, los más viejos primero)</span></div>
+      <div class="table-responsive card-scroll" style="max-height:480px">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Producto</th><th class="text-end">Unid.</th><th>Sucursales</th><th class="text-end">Días</th></tr></thead>
+          <tbody>
+            {% for d in demorados %}
+            <tr>
+              <td>{{ d.descripcion }}</td>
+              <td class="text-end">{{ d.cantidad }}</td>
+              <td>{% for s in d.sucursales[:3] %}<span class="chip-suc">{{ s }}</span> {% endfor %}{% if d.sucursales|length > 3 %}<span class="chip-suc">+{{ d.sucursales|length - 3 }}</span>{% endif %}</td>
+              <td class="text-end">{% if d.dias >= 7 %}<span class="badge-cancelado">{{ d.dias }}</span>{% elif d.dias >= 3 %}<span class="badge-pendiente">{{ d.dias }}</span>{% else %}{{ d.dias }}{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-4">Nada demorado 🎉</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

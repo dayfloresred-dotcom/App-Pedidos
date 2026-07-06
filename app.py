@@ -150,6 +150,17 @@ def consolidado():
         n_sucursales=len(suc_set), total_unidades=total_u,
         filtro_lab=lab, filtro_suc=suc, filtro_drog=drog)
 
+@app.route('/cumplimiento')
+@login_required
+@admin_required
+def cumplimiento():
+    from database import get_cumplimiento
+    periodo = request.args.get('periodo', '30')
+    dias = 30 if periodo == '30' else None
+    r = get_cumplimiento(dias=dias)
+    return render_template('cumplimiento.html', periodo=periodo,
+        g=r['global'], por_sucursal=r['por_sucursal'], demorados=r['demorados'][:25])
+
 @app.route('/ranking')
 @login_required
 @admin_required

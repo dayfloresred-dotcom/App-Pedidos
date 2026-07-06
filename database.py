@@ -541,6 +541,86 @@ def get_omitidos_sucursal(sucursal):
         out.setdefault(r['sku'], set()).add(r['drogueria'])
     return out
 
+def get_cumplimiento(dias=None):
+    """Métricas de servicio para el admin. dias=None -> histórico completo.
+    Todo se calcula en Python: son cientos de filas, no vale SQL acrobático."""
+    from datetime import datetime, timedelta
+
+    def _fecha(s):
+        try:
+            return datetime.strptime((s or '').split(' ')[0], '%d/%m/%Y').date()
+        except ValueError:
+            return None
+
+    hoy = now_local().date()
+    corte = (hoy - timedelta(days=int(dias))) if dias else None
+
+    conn = get_db()
+    sols = [dict(r) for r in conn.execute('SELECT * FROM solicitudes')]
+    items = [dict(r) for r in conn.execute('''
+        SELECT i.*, s.sucursal AS suc, s.estado AS sol_estado, s.fecha_solicitud AS sol_fecha
+        FROM items_solicitud i JOIN solicitudes s ON s.id = i.solicitud_id''')]
+    conn.close()
+
+    if corte:
+        sols = [s for s in sols if (_fecha(s['fecha_solicitud']) or hoy) >= corte]
+        items = [i for i in items if (_fecha(i['sol_fecha']) or hoy) >= corte]
+
+    # ── Global ──
+    compradas = [s for s in sols if s['estado'] == 'comprado']
+    demoras = []
+    for s in compradas:
+        f_sol, f_com = _fecha(s['fecha_solicitud']), _fecha(s['fecha_compra'])
+        if f_sol and f_com:
+            demoras.append((f_com - f_sol).days)
+    activas = [s for s in sols if s['estado'] != 'cancelado']
+    glob = {
+        'solicitudes': len(sols),
+        'compradas': len(compradas),
+        'pendientes': sum(1 for s in sols if s['estado'] == 'pendiente'),
+        'canceladas': sum(1 for s in sols if s['estado'] == 'cancelado'),
+        'pct_compradas': round(100 * len(compradas) / len(activas), 1) if activas else 0.0,
+        'dias_promedio_compra': round(sum(demoras) / len(demoras), 1) if demoras else None,
+    }
+
+    # ── Por sucursal (unidades; excluye items/solicitudes cancelados) ──
+    por_suc = {}
+    for i in items:
+        if i['cancelado'] or i['sol_estado'] == 'cancelado':
+            continue
+        d = por_suc.setdefault(i['suc'], {'pedido_u': 0, 'atendido_u': 0, 'pendiente_u': 0})
+        cant = i['cantidad'] or 0
+        d['pedido_u'] += cant
+        if i['comprado'] or i['ordenado']:
+            d['atendido_u'] += cant
+        else:
+            d['pendiente_u'] += cant
+    por_sucursal = sorted(
+        ({'sucursal': s, **v,
+          'pct': round(100 * v['atendido_u'] / v['pedido_u'], 1) if v['pedido_u'] else 0.0}
+         for s, v in por_suc.items()),
+        key=lambda x: x['pct'])
+
+    # ── Productos demorados: pendientes sin procesar, agrupados por sku ──
+    dem = {}
+    for i in items:
+        if i['cancelado'] or i['comprado'] or i['ordenado'] or i['sol_estado'] != 'pendiente':
+            continue
+        f = _fecha(i['sol_fecha']) or hoy
+        d = dem.setdefault(i['sku'], {'sku': i['sku'], 'descripcion': i['descripcion'],
+                                      'cantidad': 0, 'sucursales': set(), 'desde': f})
+        d['cantidad'] += i['cantidad'] or 0
+        d['sucursales'].add(i['suc'])
+        if f < d['desde']:
+            d['desde'] = f
+    demorados = sorted(
+        ({**d, 'sucursales': sorted(d['sucursales']), 'dias': (hoy - d.pop('desde')).days}
+         for d in dem.values()),
+        key=lambda x: -x['dias'])
+
+    return {'global': glob, 'por_sucursal': por_sucursal, 'demorados': demorados}
+
+
 def get_ranking(period='pendiente'):
     """Ranking de laboratorios y productos mas pedidos. period: 'pendiente' | 'mes' | 'todo'."""
     from datetime import datetime, timedelta
