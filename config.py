@@ -68,6 +68,10 @@ def now_local():
     """Hora local de Argentina (UTC-3, sin horario de verano)."""
     return _datetime.now(_timezone.utc).astimezone(_timezone(_timedelta(hours=-3)))
 
+def local_from_ts(ts):
+    """Convierte un timestamp de archivo a hora local Argentina (UTC-3)."""
+    return _datetime.fromtimestamp(ts, _timezone.utc).astimezone(_timezone(_timedelta(hours=-3)))
+
 # ── Fuentes automáticas (todas read-only; ver spec 2026-07-03) ─────────────
 def _mysql_cfg(prefijo):
     return {

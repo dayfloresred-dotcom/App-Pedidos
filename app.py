@@ -1,7 +1,7 @@
 import os
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify, flash, Response
 from datetime import date, datetime
-from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER, now_local
+from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER, now_local, local_from_ts
 from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas_solicitudes,
                        get_consolidado, get_detalle_por_sucursal, marcar_comprado, cancelar_solicitud,
                        get_db, actualizar_droguerias_pendientes,
@@ -10,7 +10,8 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        marcar_comprado_drogueria, marcar_inexistente,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
                        get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item,
-                       actualizar_comprado_por_envio)
+                       actualizar_comprado_por_envio,
+                       carrito_set, carrito_set_obs, get_carrito, carrito_clear, get_ranking)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -80,7 +81,8 @@ def ver_solicitud(sol_id):
         flash('Solicitud no encontrada', 'danger')
         return redirect(url_for('mis_pedidos'))
     envios = get_envios_sucursal(sol['sucursal'])
-    return render_template('confirmado.html', sol=sol, items=items, envios=envios)
+    return render_template('confirmado.html', sol=sol, items=items, envios=envios,
+        filtro_suc=request.args.get('suc', ''))
 
 @app.route('/confirmado/<int:sol_id>/fragmento')
 @login_required
@@ -135,6 +137,47 @@ def consolidado():
         n_sucursales=len(suc_set), total_unidades=total_u,
         filtro_lab=lab, filtro_suc=suc, filtro_drog=drog)
 
+@app.route('/ranking')
+@login_required
+@admin_required
+def ranking():
+    period = request.args.get('period', 'pendiente')
+    if period not in ('pendiente', 'mes', 'todo'):
+        period = 'pendiente'
+    labs, prods = get_ranking(period)
+    return render_template('ranking.html', labs=labs[:30], prods=prods[:50], period=period)
+
+@app.route('/ranking/export.xlsx')
+@login_required
+@admin_required
+def ranking_export():
+    import io, openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    period = request.args.get('period', 'pendiente')
+    if period not in ('pendiente', 'mes', 'todo'):
+        period = 'pendiente'
+    labs, prods = get_ranking(period)
+    wb = openpyxl.Workbook()
+    fill = PatternFill('solid', start_color='1F4E78')
+    ws1 = wb.active; ws1.title = 'Laboratorios'
+    ws1.append(['#', 'Laboratorio', 'Unidades'])
+    for i, (lab, u) in enumerate(labs, 1):
+        ws1.append([i, lab, u])
+    ws2 = wb.create_sheet('Productos')
+    ws2.append(['#', 'Producto', 'Laboratorio', 'Unidades'])
+    for i, (desc, lab, u) in enumerate(prods, 1):
+        ws2.append([i, desc, lab, u])
+    for ws in (ws1, ws2):
+        for c in ws[1]:
+            c.font = Font(bold=True, color='FFFFFF'); c.fill = fill; c.alignment = Alignment(horizontal='center')
+    ws1.column_dimensions['B'].width = 32; ws1.column_dimensions['C'].width = 12
+    ws2.column_dimensions['B'].width = 45; ws2.column_dimensions['C'].width = 28; ws2.column_dimensions['D'].width = 12
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    filename = f'ranking_{period}_{now_local().strftime("%d%m%y")}.xlsx'
+    return Response(buf.read(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
 def _armar_orden(filtro_suc):
     """Arma la orden agrupada por droguería. Única fuente de verdad para
     la página completa y el fragmento (refresco sin reload)."""
@@ -176,6 +219,9 @@ def _armar_orden(filtro_suc):
             detalle = [d for d in detalle if d['sucursal'] == filtro_suc]
         for d in detalle:
             d['enviado'] = get_envios(d['sucursal'], sku)
+            d['stock']   = base.get('stock_real', {}).get(d['sucursal'], 0)
+            d['venta']   = base.get('ventas', {}).get(d['sucursal'], 0)
+            d['nec']     = base.get('necesidad', {}).get(d['sucursal'], 0)
         drog = (p.get('drogueria') or '').upper()
         base_item = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext}
 
@@ -249,6 +295,7 @@ def api_productos():
         'descripcion': p['descripcion'],
         'laboratorio': p['laboratorio'],
         'drogueria':   p['drogueria'],
+        'ventas':      p['ventas'].get(suc, 0) if suc and suc != 'admin' else 0,
         'stock_real':  p['stock_real'].get(suc, 0) if suc and suc != 'admin' else 0,
         'stock_cd':    'SI' if (p.get('stock_cd') or 0) not in (0, '', 'NO') else 'NO',
     } for p in results])
@@ -264,6 +311,63 @@ def api_crear_solicitud():
     numero, sol_id = crear_solicitud(sucursal, session['username'], items)
     enviar_notificacion(numero, sucursal, items)
     return jsonify({'numero': numero, 'sol_id': sol_id})
+
+@app.route('/api/carrito', methods=['GET'])
+@login_required
+def api_carrito_get():
+    suc = request.args.get('suc', '') or session.get('username', '')
+    items = get_carrito(suc)
+    return jsonify({'items': items, 'n': len(items)})
+
+@app.route('/api/carrito/set', methods=['POST'])
+@login_required
+def api_carrito_set():
+    d = request.get_json(silent=True) or {}
+    suc = (d.get('sucursal') or session.get('username') or '').strip()
+    if not suc:
+        return jsonify({'error': 'Falta sucursal'}), 400
+    carrito_set(suc, str(d.get('sku')), d.get('ean', ''), d.get('descripcion', ''),
+                d.get('laboratorio', ''), d.get('drogueria', ''), d.get('cantidad', 0), d.get('observacion'))
+    return jsonify({'ok': True, 'n': len(get_carrito(suc))})
+
+@app.route('/api/carrito/obs', methods=['POST'])
+@login_required
+def api_carrito_obs():
+    d = request.get_json(silent=True) or {}
+    suc = (d.get('sucursal') or session.get('username') or '').strip()
+    carrito_set_obs(suc, str(d.get('sku')), d.get('observacion') or None)
+    return jsonify({'ok': True})
+
+@app.route('/api/carrito/clear', methods=['POST'])
+@login_required
+def api_carrito_clear():
+    d = request.get_json(silent=True) or {}
+    suc = (d.get('sucursal') or session.get('username') or '').strip()
+    carrito_clear(suc)
+    return jsonify({'ok': True})
+
+@app.route('/api/carrito/confirmar', methods=['POST'])
+@login_required
+def api_carrito_confirmar():
+    d = request.get_json(silent=True) or {}
+    suc = (d.get('sucursal') or session.get('username') or '').strip()
+    if not suc:
+        return jsonify({'error': 'Falta sucursal'}), 400
+    items = get_carrito(suc)
+    if not items:
+        return jsonify({'error': 'El carrito está vacío'}), 400
+    numero, sol_id = crear_solicitud(suc, session['username'], items)
+    enviar_notificacion(numero, suc, items)
+    carrito_clear(suc)
+    return jsonify({'ok': True, 'sol_id': sol_id, 'numero': numero})
+
+@app.route('/carrito')
+@login_required
+def carrito():
+    suc = request.args.get('suc', '') or session.get('username', '')
+    items = get_carrito(suc)
+    total = sum(i['cantidad'] for i in items)
+    return render_template('carrito.html', items=items, sucursal=suc, total=total)
 
 @app.route('/api/detalle-sucursal')
 @login_required
@@ -513,7 +617,7 @@ def exportar(drogueria):
         filename = f'sud_{suc_slug}_{now_local().strftime("%d%m%y")}.dds'
 
     return Response(
-        content,
+        content.encode('latin-1', errors='replace'),
         mimetype='application/octet-stream',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
@@ -559,6 +663,8 @@ def reporte_rotacion():
     import io, openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
     UMBRAL = 2  # 'stock alto' del donante
+    # Sucursales de shopping: dejan 1 unidad de exhibición al donar
+    SHOPPING = {'NUEVO CENTRO', 'LIBERTAD', 'PASEO RIVERA', 'LUGONES', 'SABATTINI'}
     prods = load_productos()
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Rotacion'
     ws.append(['EAN', 'Producto', 'Laboratorio', 'Desde (sucursal)', 'Stock donante',
@@ -571,10 +677,15 @@ def reporte_rotacion():
         recept = [(su, ventas.get(su, 0)) for su in sucs if stock.get(su, 0) == 0 and ventas.get(su, 0) > 0]
         if not donors or not recept:
             continue
-        donors = sorted(donors, key=lambda x: -x[1])
         recept = sorted(recept, key=lambda x: -x[1])
-        avail = [[su, q] for su, q in donors]          # stock disponible mutable
         orig  = {su: q for su, q in donors}            # stock original (para mostrar)
+        # cantidad que puede donar: shopping deja 1 de exhibición
+        donors = [(su, (q - 1 if su in SHOPPING else q)) for su, q in donors]
+        donors = [(su, q) for su, q in donors if q > 0]
+        donors = sorted(donors, key=lambda x: -x[1])
+        if not donors:
+            continue
+        avail = [[su, q] for su, q in donors]          # stock disponible a mover (mutable)
         for rsuc, rneed in recept:
             need = rneed
             for row in avail:
@@ -644,7 +755,7 @@ def actualizar_datos():
         path = cfg['path']
         if os.path.exists(path):
             mtime = os.path.getmtime(path)
-            info = {'existe': True, 'fecha': datetime.fromtimestamp(mtime).strftime('%d/%m/%Y %H:%M')}
+            info = {'existe': True, 'fecha': local_from_ts(mtime).strftime('%d/%m/%Y %H:%M')}
         else:
             info = {'existe': False, 'fecha': '—'}
         archivos_info[field] = {**cfg, **info, 'nombre': os.path.basename(path)}
