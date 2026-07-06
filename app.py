@@ -21,9 +21,20 @@ from database import get_fuentes_estado, agregar_mapeos_cd
 from fuentes import refrescar_fuentes, NO_MATCH_JSON
 import fuentes as fuentes_mod
 
+from flask_wtf import CSRFProtect
+
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+# Cookies de sesión endurecidas. SECURE solo en el contenedor (detrás de
+# Caddy con HTTPS); en desarrollo local se sirve por http.
+app.config.update(
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=bool(os.environ.get('PEDIDOS_DB_PATH')),
+    WTF_CSRF_TIME_LIMIT=None,  # el token vale toda la sesión (turnos largos)
+)
+csrf = CSRFProtect(app)
 
 @app.route('/health')
 def health():
@@ -808,6 +819,7 @@ def actualizar_datos():
 
 
 @app.route('/api/fuentes/refrescar', methods=['POST'])
+@csrf.exempt  # el cron no tiene sesión: se autentica por X-Cron-Token
 def api_refrescar_fuentes():
     token = request.headers.get('X-Cron-Token', '')
     autorizado_cron = bool(FUENTES_CRON_TOKEN) and token == FUENTES_CRON_TOKEN

@@ -1,6 +1,20 @@
 /* Micro-UX global: toasts, confirmaciones y estados de carga.
    Requiere bootstrap.bundle (ya cargado en base.html). */
 (function () {
+  // CSRF: todos los fetch mutantes same-origin llevan el token del <meta>
+  // (el server rechaza POST sin token; ver CSRFProtect en app.py).
+  const _fetch = window.fetch;
+  window.fetch = function (url, opts) {
+    opts = opts || {};
+    const metodo = (opts.method || 'GET').toUpperCase();
+    const esLocal = typeof url === 'string' && (url.startsWith('/') || url.startsWith(location.origin));
+    if (esLocal && metodo !== 'GET' && metodo !== 'HEAD') {
+      const meta = document.querySelector('meta[name="csrf-token"]');
+      if (meta) opts.headers = Object.assign({}, opts.headers, {'X-CSRFToken': meta.content});
+    }
+    return _fetch.call(this, url, opts);
+  };
+
   function contenedor() {
     let c = document.getElementById('toast-wrap');
     if (!c) {

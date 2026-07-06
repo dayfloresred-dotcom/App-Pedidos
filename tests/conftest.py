@@ -17,6 +17,8 @@ import app as app_module  # noqa: E402  (importa la app DESPUÉS de setear env)
 @pytest.fixture()
 def client():
     app_module.app.config['TESTING'] = True
+    # CSRF off por default en la suite; test_csrf.py lo habilita explícitamente.
+    app_module.app.config['WTF_CSRF_ENABLED'] = False
     with app_module.app.test_client() as c:
         yield c
 

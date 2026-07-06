@@ -37,6 +37,7 @@
         {% if sol.estado == 'pendiente' %}
         <form method="post" action="{{ url_for('cancelar', sol_id=sol.id) }}" style="display:inline"
               onsubmit="return confirm('¿Seguro que querés cancelar TODO el pedido {{ sol.numero }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-sm btn-outline-danger">✕ Cancelar pedido completo</button>
         </form>
         {% endif %}

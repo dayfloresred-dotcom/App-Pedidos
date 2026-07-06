@@ -38,6 +38,7 @@
   {% endif %}
   <form method="post" action="{{ url_for('fuentes_subir_mapeos') }}" enctype="multipart/form-data"
         class="d-flex gap-2 align-items-center">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="file" name="archivo" accept=".csv" class="form-control form-control-sm" style="width:230px">
     <button type="submit" class="btn btn-sm btn-suave">Subir mapeos CD</button>
   </form>
@@ -47,6 +48,7 @@
 <p class="text-muted small mb-3">Subí los archivos nuevos. Solo los archivos que selecciones se actualizan — el resto queda igual.</p>
 
 <form method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="card">
     <div class="card-body p-0">
       <table class="table table-sm mb-0">
