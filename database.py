@@ -494,6 +494,37 @@ def get_omitidos_sucursal(sucursal):
         out.setdefault(r['sku'], set()).add(r['drogueria'])
     return out
 
+def get_ranking(period='pendiente'):
+    """Ranking de laboratorios y productos mas pedidos. period: 'pendiente' | 'mes' | 'todo'."""
+    from datetime import datetime, timedelta
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT i.sku, i.descripcion, i.laboratorio, i.cantidad, i.cancelado, s.estado, s.fecha_solicitud
+        FROM items_solicitud i JOIN solicitudes s ON s.id = i.solicitud_id
+    """).fetchall()
+    conn.close()
+    corte = (now_local() - timedelta(days=30)).date()
+    labs, prods = {}, {}
+    for r in rows:
+        if r['cancelado']:
+            continue
+        if period == 'pendiente' and r['estado'] != 'pendiente':
+            continue
+        if period == 'mes':
+            try:
+                fs = datetime.strptime((r['fecha_solicitud'] or '').split(' ')[0], '%d/%m/%Y').date()
+            except ValueError:
+                continue
+            if fs < corte:
+                continue
+        lab = r['laboratorio'] or '(sin laboratorio)'
+        labs[lab] = labs.get(lab, 0) + (r['cantidad'] or 0)
+        key = (r['sku'], r['descripcion'])
+        prods[key] = prods.get(key, 0) + (r['cantidad'] or 0)
+    labs_r  = sorted(labs.items(), key=lambda x: -x[1])
+    prods_r = sorted([(k[1], v) for k, v in prods.items()], key=lambda x: -x[1])
+    return labs_r, prods_r
+
 def carrito_set(sucursal, sku, ean, desc, lab, drog, cantidad, observacion=None):
     conn = get_db()
     try: c = int(cantidad)

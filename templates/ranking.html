@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+  <h5 class="mb-0">Ranking de más pedidos</h5>
+  <form method="get" class="d-flex align-items-center gap-1">
+    <span class="small text-muted">Período:</span>
+    <select name="period" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <option value="pendiente" {% if period=='pendiente' %}selected{% endif %}>Pedidos pendientes</option>
+      <option value="mes" {% if period=='mes' %}selected{% endif %}>Último mes</option>
+      <option value="todo" {% if period=='todo' %}selected{% endif %}>Histórico (todo)</option>
+    </select>
+  </form>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header fw-bold" style="background:#f2efe8">Laboratorios más pedidos</div>
+      <div class="table-responsive" style="max-height:520px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th style="width:40px">#</th><th>Laboratorio</th><th class="text-end">Unidades</th></tr></thead>
+          <tbody>
+            {% for lab, u in labs %}
+            <tr><td class="text-muted">{{ loop.index }}</td><td>{{ lab }}</td><td class="text-end fw-bold">{{ u }}</td></tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-4">Sin datos para este período</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header fw-bold" style="background:#f2efe8">Productos más pedidos</div>
+      <div class="table-responsive" style="max-height:520px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th style="width:40px">#</th><th>Producto</th><th class="text-end">Unidades</th></tr></thead>
+          <tbody>
+            {% for desc, u in prods %}
+            <tr><td class="text-muted">{{ loop.index }}</td><td>{{ desc }}</td><td class="text-end fw-bold">{{ u }}</td></tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-4">Sin datos para este período</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

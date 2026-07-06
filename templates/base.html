@@ -16,8 +16,8 @@
         <a href="{{ url_for('nueva_solicitud') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'nueva_solicitud' %}active{% endif %}">Nueva solicitud</a>
         <a href="{{ url_for('mis_pedidos') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'mis_pedidos' %}active{% endif %}">Mis pedidos</a>
         {% if session.get('rol') == 'admin' %}
-          <a href="{{ url_for('consolidado') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'consolidado' %}active{% endif %}">Consolidado</a>
           <a href="{{ url_for('generar_orden') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'generar_orden' %}active{% endif %}">Generar orden</a>
+          <a href="{{ url_for('ranking') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'ranking' %}active{% endif %}">Ranking</a>
           <a href="{{ url_for('actualizar_datos') }}" class="btn btn-sm nav-btn {% if request.endpoint == 'actualizar_datos' %}active{% endif %}">↑ Actualizar datos</a>
         {% endif %}
         <span class="small align-self-center ms-2" style="color:#fff">{{ session.get('username') }}</span>

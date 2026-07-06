@@ -11,7 +11,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
                        get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item,
                        actualizar_comprado_por_envio,
-                       carrito_set, carrito_set_obs, get_carrito, carrito_clear)
+                       carrito_set, carrito_set_obs, get_carrito, carrito_clear, get_ranking)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
@@ -118,6 +118,16 @@ def consolidado():
         n_sucursales=len(suc_set), total_unidades=total_u,
         filtro_lab=lab, filtro_suc=suc, filtro_drog=drog)
 
+@app.route('/ranking')
+@login_required
+@admin_required
+def ranking():
+    period = request.args.get('period', 'pendiente')
+    if period not in ('pendiente', 'mes', 'todo'):
+        period = 'pendiente'
+    labs, prods = get_ranking(period)
+    return render_template('ranking.html', labs=labs[:30], prods=prods[:50], period=period)
+
 @app.route('/generar-orden')
 @login_required
 @admin_required
@@ -162,6 +172,9 @@ def generar_orden():
             detalle = [d for d in detalle if d['sucursal'] == filtro_suc]
         for d in detalle:
             d['enviado'] = get_envios(d['sucursal'], sku)
+            d['stock']   = base.get('stock_real', {}).get(d['sucursal'], 0)
+            d['venta']   = base.get('ventas', {}).get(d['sucursal'], 0)
+            d['nec']     = base.get('necesidad', {}).get(d['sucursal'], 0)
         drog = (p.get('drogueria') or '').upper()
         base_item = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext}
 
