@@ -111,21 +111,37 @@ def init_db():
     conn.commit()
     conn.close()
 
-def generar_numero():
-    conn = get_db()
-    row = conn.execute('SELECT COUNT(*) as c FROM solicitudes').fetchone()
-    n = row['c'] + 1
-    conn.close()
-    return f'SOL-{n:06d}'
+def generar_numero(conn=None):
+    """Próximo número: MAX existente + 1. (COUNT(*)+1 reusaba números tras un
+    borrado y duplicaba bajo escrituras concurrentes; numero es UNIQUE.)"""
+    propia = conn is None
+    if propia:
+        conn = get_db()
+    row = conn.execute(
+        "SELECT COALESCE(MAX(CAST(substr(numero, 5) AS INTEGER)), 0) AS m FROM solicitudes"
+    ).fetchone()
+    if propia:
+        conn.close()
+    return f"SOL-{row['m'] + 1:06d}"
 
 def crear_solicitud(sucursal, creado_por, items):
     conn = get_db()
-    numero = generar_numero()
     fecha  = now_local().strftime('%d/%m/%Y %H:%M')
-    conn.execute(
-        'INSERT INTO solicitudes (numero, sucursal, creado_por, fecha_solicitud) VALUES (?,?,?,?)',
-        (numero, sucursal, creado_por, fecha)
-    )
+    # Reintento: si dos workers calculan el mismo número, el UNIQUE rechaza al
+    # segundo, que recalcula sobre lo ya insertado.
+    for _ in range(5):
+        numero = generar_numero(conn)
+        try:
+            conn.execute(
+                'INSERT INTO solicitudes (numero, sucursal, creado_por, fecha_solicitud) VALUES (?,?,?,?)',
+                (numero, sucursal, creado_por, fecha)
+            )
+            break
+        except sqlite3.IntegrityError:
+            continue
+    else:
+        conn.close()
+        raise RuntimeError('No se pudo asignar un número de solicitud único')
     sol_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
     for it in items:
         conn.execute(
