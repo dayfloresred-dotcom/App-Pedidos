@@ -496,10 +496,21 @@ def actualizar_comprado_por_envio(sucursal, sku):
     conn.close()
 
 def get_envios_sucursal_drogueria(sucursal, drogueria):
-    """Unidades enviadas de cada producto a una sucursal desde una droguería (para export por sucursal)."""
+    """Unidades enviadas de cada producto a una sucursal desde una droguería (para export por sucursal).
+
+    Solo incluye productos que siguen en un pedido PENDIENTE de esa sucursal, para que el archivo
+    exportado coincida con lo que se ve en la orden y no arrastre envíos de pedidos ya cerrados.
+    No borra ni modifica la tabla de envíos (queda intacta para la auditoría / Cumplimiento)."""
     conn = get_db()
     rows = conn.execute(
-        "SELECT sku, cantidad FROM envios WHERE sucursal=? AND drogueria=? AND cantidad>0",
+        """SELECT e.sku, e.cantidad FROM envios e
+           WHERE e.sucursal=? AND e.drogueria=? AND e.cantidad>0
+             AND EXISTS (
+               SELECT 1 FROM items_solicitud i
+               JOIN solicitudes s ON s.id = i.solicitud_id
+               WHERE i.sku = e.sku AND s.sucursal = e.sucursal
+                 AND s.estado = 'pendiente' AND i.cancelado = 0
+             )""",
         (sucursal, drogueria)
     ).fetchall()
     conn.close()

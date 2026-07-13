@@ -15,13 +15,13 @@ def test_root_redirige_a_login(client):
 
 
 def test_paginas_admin_renderizan(admin):
-    for url in ['/consolidado', '/generar-orden', '/mis-pedidos',
+    for url in ['/generar-orden', '/mis-pedidos',
                 '/nueva-solicitud', '/actualizar-datos']:
         assert admin.get(url).status_code == 200, url
 
 
 def test_sucursal_no_ve_admin(sucursal):
-    assert sucursal.get('/consolidado').status_code == 403
+    assert sucursal.get('/generar-orden').status_code == 403
 
 
 def test_base_incluye_sistema(admin):

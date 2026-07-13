@@ -46,7 +46,7 @@ def index():
     if 'username' not in session:
         return redirect(url_for('login'))
     if session.get('rol') == 'admin':
-        return redirect(url_for('consolidado'))
+        return redirect(url_for('generar_orden'))
     return redirect(url_for('nueva_solicitud'))
 
 @app.route('/login', methods=['GET','POST'])
@@ -76,7 +76,13 @@ def nueva_solicitud():
 @app.route('/mis-pedidos')
 @login_required
 def mis_pedidos():
-    filtro_suc = request.args.get('suc','')
+    # Recuerda el ultimo filtro de sucursal: si viene en la URL lo guarda,
+    # si no (p.ej. al volver por el menu) reusa el ultimo elegido.
+    if 'suc' in request.args:
+        filtro_suc = request.args.get('suc','')
+        session['mis_pedidos_suc'] = filtro_suc
+    else:
+        filtro_suc = session.get('mis_pedidos_suc','')
     if session.get('rol') == 'admin':
         solic = get_todas_solicitudes(sucursal_filtro=filtro_suc or None)
     else:
@@ -127,29 +133,6 @@ def cancelar(sol_id):
     return redirect(url_for('mis_pedidos'))
 
 # ── Admin only ─────────────────────────────────────────────────────────────
-@app.route('/consolidado')
-@login_required
-@admin_required
-def consolidado():
-    lab  = request.args.get('lab','')
-    suc  = request.args.get('suc','')
-    drog = request.args.get('drog','')
-    prods = get_consolidado(
-        sucursal_filtro=suc or None,
-        lab_filtro=lab or None,
-        drogueria_filtro=drog or None
-    )
-    suc_set = set()
-    total_u = 0
-    for p in prods:
-        total_u += p['total']
-        for s in (p.get('sucursales') or '').split(','):
-            if s.strip(): suc_set.add(s.strip())
-    return render_template('consolidado.html',
-        productos=prods, sucursales=SUCURSAL_NAMES,
-        n_sucursales=len(suc_set), total_unidades=total_u,
-        filtro_lab=lab, filtro_suc=suc, filtro_drog=drog)
-
 @app.route('/cumplimiento')
 @login_required
 @admin_required
