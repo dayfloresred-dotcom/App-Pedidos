@@ -9,7 +9,7 @@ import fuentes_comparador
 import fuentes_plex
 import fuentes_quantio
 from config import DATA_DIR
-from database import get_mapeo_cd, set_fuente_estado
+from database import get_mapeo_cd, set_fuente_estado, actualizar_droguerias_pendientes
 from data_loader import decidir_drogueria
 
 _DIR_MEMORIA = DATA_DIR  # override en tests
@@ -158,5 +158,16 @@ def refrescar_fuentes():
     with open(data_loader.CACHE_FILE, 'wb') as f:
         pickle.dump(catalogo, f)
     data_loader._productos = catalogo
+
+    # Reasignar la droguería de los pedidos YA pendientes con los datos nuevos
+    # (mismo criterio que el alta manual de archivos): si un producto ahora tiene
+    # stock en CD pasa a Droguería Red, y viceversa. Sin esto, el refresco
+    # actualizaba el catálogo pero los pedidos viejos no se movían de tarjeta.
+    try:
+        prod_map = {pr['sku']: pr for pr in catalogo}
+        resumen['pendientes_reasignados'] = actualizar_droguerias_pendientes(prod_map)
+    except Exception as e:
+        resumen['pendientes_reasignados'] = f'error: {type(e).__name__}: {e}'
+
     resumen['ok'] = True
     return resumen
