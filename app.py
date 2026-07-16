@@ -282,16 +282,21 @@ def _armar_orden(filtro_suc):
 @admin_required
 def generar_orden():
     filtro_suc = request.args.get('suc', '')
+    filtro_lab = request.args.get('lab', '')
     orden, sucs_orden = _armar_orden(filtro_suc)
-    labs_orden = sorted({(it.get('laboratorio') or '').strip()
-                         for its in orden.values() for it in its
-                         if (it.get('laboratorio') or '').strip()})
+    labs_set = {(it.get('laboratorio') or '').strip()
+                for its in orden.values() for it in its
+                if (it.get('laboratorio') or '').strip()}
+    if filtro_lab:
+        labs_set.add(filtro_lab)  # el lab elegido siempre queda como opcion (filtro fijo)
+    labs_orden = sorted(labs_set)
     return render_template('generar_orden.html',
         orden=orden,
         sucs_orden=sucs_orden,
         labs_orden=labs_orden,
         sucursales=SUCURSAL_NAMES,
         filtro_suc=filtro_suc,
+        filtro_lab=filtro_lab,
         hoy=now_local().strftime('%d/%m/%Y'))
 
 

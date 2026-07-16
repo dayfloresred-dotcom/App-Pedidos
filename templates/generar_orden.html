@@ -3,21 +3,21 @@
 <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
   <h5 class="mb-0">Generar orden de compra</h5>
   <span class="text-muted small">Fecha: {{ hoy }}</span>
-  <form method="get" class="d-flex align-items-center gap-1">
+  <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
     <span class="small text-muted">Ver sucursal:</span>
     <select name="suc" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
       <option value="">Todas</option>
       {% for su in sucursales %}<option value="{{ su }}" {% if filtro_suc==su %}selected{% endif %}>{{ su }}</option>{% endfor %}
     </select>
-    {% if filtro_suc %}<a href="{{ url_for('generar_orden') }}" class="btn btn-sm btn-outline-secondary">✕</a>{% endif %}
+    <span class="small text-muted">Laboratorio:</span>
+    <select id="filtro-lab-orden" name="lab" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for l in labs_orden %}<option value="{{ l }}" {% if filtro_lab==l %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select>
+    {% if filtro_suc or filtro_lab %}<a href="{{ url_for('generar_orden') }}" class="btn btn-sm btn-outline-secondary">✕ Limpiar</a>{% endif %}
   </form>
   <input id="buscar-orden" type="text" class="form-control form-control-sm" style="width:230px"
     placeholder="Buscar por nombre o EAN" oninput="aplicarFiltrosOrden()">
-  <select id="filtro-lab-orden" class="form-select form-select-sm" style="width:auto"
-    onchange="aplicarFiltrosOrden()">
-    <option value="">Todos los laboratorios</option>
-    {% for l in labs_orden %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
-  </select>
   <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
     {% if sucs_orden %}
     <span class="small text-muted">Exportar pedido de:</span>
@@ -54,6 +54,7 @@ function aplicarFiltrosOrden() {
 }
 // alias por compatibilidad
 function filtrarOrden() { aplicarFiltrosOrden(); }
+document.addEventListener('DOMContentLoaded', aplicarFiltrosOrden);
 
 function toggleDet(rid, btn) {
   const row = document.querySelector('.detalle-' + CSS.escape(rid));
