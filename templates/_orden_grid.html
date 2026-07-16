@@ -15,20 +15,20 @@
           <thead><tr>
             <th>EAN</th><th>Producto</th><th>Sucursales</th>
             {% if drog == 'DROGUERIA RED' %}<th class="text-center">Stock CD</th><th class="text-center">Alt. droguería</th>{% endif %}
-            <th class="text-center">Solicitado</th><th></th>
+            <th class="text-center" style="width:78px">Solicitado</th><th style="width:34px"></th>
           </tr></thead>
           <tbody>
             {% for it in items %}
             {% set rid = (drog ~ '_' ~ it.sku)|replace(' ', '') %}
             {% set tot = it.detalle_suc|length %}
-            <tr class="prod-row" data-rid="{{ rid }}" data-buscar="{{ (it.descripcion ~ ' ' ~ it.ean)|lower }}">
+            <tr class="prod-row" data-rid="{{ rid }}" data-buscar="{{ (it.descripcion ~ ' ' ~ it.ean)|lower }}" data-lab="{{ (it.laboratorio or '')|lower }}">
               <td class="text-muted small" style="font-size:11px">{{ it.ean[:13] }}</td>
               <td style="font-size:12px">
                 {% if tot > 0 %}
                 <button class="btn btn-sm btn-link p-0 me-1" style="text-decoration:none"
                   onclick="toggleDet('{{ rid }}', this)">&#9656;</button>
                 {% endif %}
-                {{ it.descripcion[:32] }}
+                {{ it.descripcion }}
                 {% if it.es_overflow %}<span class="ms-1 excedente-tag">excedente CD</span>{% endif %}
 
               </td>
@@ -45,8 +45,8 @@
               {% endif %}
               <td class="text-center">
                 <input type="number" min="1" value="{{ it.total }}"
-                  class="form-control form-control-sm qty-input"
-                  data-sku="{{ it.sku }}" data-drog="{{ drog }}">
+                  class="form-control form-control-sm qty-input d-inline-block text-center"
+                  style="width:60px" data-sku="{{ it.sku }}" data-drog="{{ drog }}">
               </td>
               <td>
                 {% if it.es_overflow %}

@@ -17,7 +17,7 @@ from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
 from export_service import generar_suizo, generar_sud, generar_quantio
 from config import FUENTES_CRON_TOKEN
-from database import get_fuentes_estado, agregar_mapeos_cd
+from database import get_fuentes_estado, agregar_mapeos_cd, get_rotacion_marcada
 from fuentes import refrescar_fuentes, NO_MATCH_JSON
 import fuentes as fuentes_mod
 
@@ -283,9 +283,13 @@ def _armar_orden(filtro_suc):
 def generar_orden():
     filtro_suc = request.args.get('suc', '')
     orden, sucs_orden = _armar_orden(filtro_suc)
+    labs_orden = sorted({(it.get('laboratorio') or '').strip()
+                         for its in orden.values() for it in its
+                         if (it.get('laboratorio') or '').strip()})
     return render_template('generar_orden.html',
         orden=orden,
         sucs_orden=sucs_orden,
+        labs_orden=labs_orden,
         sucursales=SUCURSAL_NAMES,
         filtro_suc=filtro_suc,
         hoy=now_local().strftime('%d/%m/%Y'))
@@ -703,6 +707,8 @@ def reporte_rotacion():
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Rotacion'
     ws.append(['EAN', 'Producto', 'Laboratorio', 'Desde (sucursal)', 'Stock donante',
                'Hacia (sucursal)', 'Ventas receptor', 'Cantidad a mover'])
+    rot_set  = get_rotacion_marcada()  # (sucursal, sku) marcados como rotación en Generar orden
+    fill_rot = PatternFill('solid', start_color='C6EFCE')  # verde: fila ya marcada
     for p in prods:
         stock  = p.get('stock_real', {}) or {}
         if ventas90 is not None:
@@ -734,6 +740,9 @@ def reporte_rotacion():
                 move = min(row[1], need)
                 ws.append([p['ean'], (p['descripcion'] or '')[:45], p['laboratorio'],
                            row[0], orig[row[0]], rsuc, rneed, move])
+                if (str(rsuc), str(p['sku'])) in rot_set:
+                    for _c in ws[ws.max_row]:
+                        _c.fill = fill_rot
                 row[1] -= move
                 need   -= move
     # estilo cabecera
@@ -743,6 +752,10 @@ def reporte_rotacion():
     for col, w in {'A':15,'B':45,'C':22,'D':16,'E':13,'F':16,'G':14,'H':15}.items():
         ws.column_dimensions[col].width = w
     ws.freeze_panes = 'A2'
+    ws['J1'] = 'Verde = ya marcado como rotación en Generar orden'
+    ws['J1'].fill = fill_rot
+    ws['J1'].font = Font(bold=True)
+    ws.column_dimensions['J'].width = 46
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     filename = f'rotacion_{now_local().strftime("%d%m%y")}.xlsx'
     return Response(buf.read(),

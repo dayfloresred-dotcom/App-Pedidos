@@ -12,7 +12,12 @@
     {% if filtro_suc %}<a href="{{ url_for('generar_orden') }}" class="btn btn-sm btn-outline-secondary">✕</a>{% endif %}
   </form>
   <input id="buscar-orden" type="text" class="form-control form-control-sm" style="width:230px"
-    placeholder="Buscar por nombre o EAN" oninput="filtrarOrden(this.value)">
+    placeholder="Buscar por nombre o EAN" oninput="aplicarFiltrosOrden()">
+  <select id="filtro-lab-orden" class="form-select form-select-sm" style="width:auto"
+    onchange="aplicarFiltrosOrden()">
+    <option value="">Todos los laboratorios</option>
+    {% for l in labs_orden %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
+  </select>
   <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
     {% if sucs_orden %}
     <span class="small text-muted">Exportar pedido de:</span>
@@ -35,15 +40,20 @@
 {% endblock %}
 {% block scripts %}
 <script>
-function filtrarOrden(q) {
-  const t = (q || '').trim().toLowerCase();
+function aplicarFiltrosOrden() {
+  const t = (document.getElementById('buscar-orden')?.value || '').trim().toLowerCase();
+  const lab = (document.getElementById('filtro-lab-orden')?.value || '').toLowerCase();
   document.querySelectorAll('#orden-grid tr.prod-row').forEach(row => {
-    const ok = !t || (row.dataset.buscar || '').includes(t);
+    const okText = !t || (row.dataset.buscar || '').includes(t);
+    const okLab  = !lab || (row.dataset.lab || '') === lab;
+    const ok = okText && okLab;
     row.style.display = ok ? '' : 'none';
     const det = document.querySelector('.detalle-' + CSS.escape(row.dataset.rid));
     if (det && !ok) det.style.display = 'none';
   });
 }
+// alias por compatibilidad
+function filtrarOrden() { aplicarFiltrosOrden(); }
 
 function toggleDet(rid, btn) {
   const row = document.querySelector('.detalle-' + CSS.escape(rid));
@@ -81,8 +91,7 @@ async function refrescarOrden() {
     if (scrolls[i] !== undefined) b.scrollTop = scrolls[i];
   });
   window.scrollTo(0, scrollY);
-  const bq = document.getElementById('buscar-orden');
-  if (bq && bq.value) filtrarOrden(bq.value);
+  aplicarFiltrosOrden();
 }
 
 async function descargar(url, payload, fallbackName) {

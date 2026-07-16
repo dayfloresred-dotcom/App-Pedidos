@@ -495,6 +495,15 @@ def actualizar_comprado_por_envio(sucursal, sku):
     conn.commit()
     conn.close()
 
+def get_rotacion_marcada():
+    """Set de (sucursal, sku) que el admin marcó como ROTACIÓN en Generar orden
+    (envío con droguería 'ROT'). Se usa para resaltar esas filas en el reporte."""
+    conn = get_db()
+    rows = conn.execute("SELECT sucursal, sku FROM envios WHERE drogueria='ROT' AND cantidad>0").fetchall()
+    conn.close()
+    return {(str(r['sucursal']), str(r['sku'])) for r in rows}
+
+
 def get_envios_sucursal_drogueria(sucursal, drogueria):
     """Unidades enviadas de cada producto a una sucursal desde una droguería (para export por sucursal).
 
