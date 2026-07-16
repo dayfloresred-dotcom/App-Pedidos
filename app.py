@@ -257,14 +257,14 @@ def ranking_export():
     for i, (lab, u) in enumerate(labs, 1):
         ws1.append([i, lab, u])
     ws2 = wb.create_sheet('Productos')
-    ws2.append(['#', 'Producto', 'Laboratorio', 'Unidades'])
-    for i, (desc, lab, u) in enumerate(prods, 1):
-        ws2.append([i, desc, lab, u])
+    ws2.append(['#', 'EAN', 'Producto', 'Laboratorio', 'Unidades'])
+    for i, (ean, desc, lab, u) in enumerate(prods, 1):
+        ws2.append([i, ean, desc, lab, u])
     for ws in (ws1, ws2):
         for c in ws[1]:
             c.font = Font(bold=True, color='FFFFFF'); c.fill = fill; c.alignment = Alignment(horizontal='center')
     ws1.column_dimensions['B'].width = 32; ws1.column_dimensions['C'].width = 12
-    ws2.column_dimensions['B'].width = 45; ws2.column_dimensions['C'].width = 28; ws2.column_dimensions['D'].width = 12
+    ws2.column_dimensions['B'].width = 16; ws2.column_dimensions['C'].width = 45; ws2.column_dimensions['D'].width = 28; ws2.column_dimensions['E'].width = 12
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     filename = f'ranking_{period}_{now_local().strftime("%d%m%y")}.xlsx'
     return Response(buf.read(),

@@ -678,7 +678,7 @@ def get_ranking(period='pendiente'):
     from datetime import datetime, timedelta
     conn = get_db()
     rows = conn.execute("""
-        SELECT i.sku, i.descripcion, i.laboratorio, i.cantidad, i.cancelado, s.estado, s.fecha_solicitud
+        SELECT i.sku, i.ean, i.descripcion, i.laboratorio, i.cantidad, i.cancelado, s.estado, s.fecha_solicitud
         FROM items_solicitud i JOIN solicitudes s ON s.id = i.solicitud_id
     """).fetchall()
     conn.close()
@@ -698,10 +698,10 @@ def get_ranking(period='pendiente'):
                 continue
         lab = r['laboratorio'] or '(sin laboratorio)'
         labs[lab] = labs.get(lab, 0) + (r['cantidad'] or 0)
-        key = (r['sku'], r['descripcion'], lab)
+        key = (r['sku'], r['ean'], r['descripcion'], lab)
         prods[key] = prods.get(key, 0) + (r['cantidad'] or 0)
     labs_r  = sorted(labs.items(), key=lambda x: -x[1])
-    prods_r = sorted([(k[1], k[2], v) for k, v in prods.items()], key=lambda x: -x[2])
+    prods_r = sorted([(k[1], k[2], k[3], v) for k, v in prods.items()], key=lambda x: -x[3])
     return labs_r, prods_r
 
 def carrito_set(sucursal, sku, ean, desc, lab, drog, cantidad, observacion=None):
