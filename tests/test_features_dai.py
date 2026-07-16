@@ -71,7 +71,7 @@ def test_get_ranking_periodos_y_laboratorio(db_limpia):
         {'sku': '902', 'descripcion': 'RANK DOS', 'laboratorio': 'LAB RANK', 'cantidad': 2},
     ])
     labs, prods = get_ranking('pendiente')
-    labs_d, prods_d = dict(labs), {(d, l): u for d, l, u in prods}
+    labs_d, prods_d = dict(labs), {(d, l): u for e, d, l, u in prods}
     assert labs_d.get('LAB RANK', 0) >= 9
     assert prods_d.get(('RANK UNO', 'LAB RANK'), 0) >= 7
     # 'todo' incluye al menos lo mismo que 'pendiente'
