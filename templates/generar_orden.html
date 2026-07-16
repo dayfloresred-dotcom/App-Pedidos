@@ -14,7 +14,7 @@
       <option value="">Todos</option>
       {% for l in labs_orden %}<option value="{{ l }}" {% if filtro_lab==l %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select>
-    {% if filtro_suc or filtro_lab %}<a href="{{ url_for('generar_orden') }}" class="btn btn-sm btn-outline-secondary">✕ Limpiar</a>{% endif %}
+    {% if filtro_suc or filtro_lab %}<a href="{{ url_for('generar_orden', suc='', lab='') }}" class="btn btn-sm btn-outline-secondary">✕ Limpiar</a>{% endif %}
   </form>
   <input id="buscar-orden" type="text" class="form-control form-control-sm" style="width:230px"
     placeholder="Buscar por nombre o EAN" oninput="aplicarFiltrosOrden()">

@@ -281,8 +281,19 @@ def _armar_orden(filtro_suc):
 @login_required
 @admin_required
 def generar_orden():
-    filtro_suc = request.args.get('suc', '')
-    filtro_lab = request.args.get('lab', '')
+    # Recuerda los filtros (sucursal + laboratorio) en la sesion: si vienen en la
+    # URL los guarda; si no (p.ej. al volver por el menu) los restaura via redirect
+    # para que la URL quede consistente con lo que se ve.
+    if 'suc' in request.args or 'lab' in request.args:
+        filtro_suc = request.args.get('suc', '')
+        filtro_lab = request.args.get('lab', '')
+        session['gen_orden_suc'] = filtro_suc
+        session['gen_orden_lab'] = filtro_lab
+    else:
+        filtro_suc = session.get('gen_orden_suc', '')
+        filtro_lab = session.get('gen_orden_lab', '')
+        if filtro_suc or filtro_lab:
+            return redirect(url_for('generar_orden', suc=filtro_suc, lab=filtro_lab))
     orden, sucs_orden = _armar_orden(filtro_suc)
     labs_set = {(it.get('laboratorio') or '').strip()
                 for its in orden.values() for it in its
