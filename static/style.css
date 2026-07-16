@@ -62,7 +62,7 @@ h5 { font-weight: 600; color: var(--texto); }
 .card { border: 1px solid var(--borde); border-radius: var(--radio); background: var(--tarjeta); }
 .card-header { background: var(--tarjeta-head); border-bottom: 1px solid var(--borde); font-weight: 600; }
 .card-footer { background: var(--tarjeta-head); border-top: 1px solid var(--borde); }
-.card-scroll { max-height: 620px; overflow-y: auto; }
+.card-scroll { max-height: 480px; overflow-y: auto; }
 .table { color: var(--texto); }
 .table thead th {
   background: var(--tarjeta-head); color: var(--texto-suave);
