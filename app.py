@@ -322,8 +322,14 @@ def _armar_orden(filtro_suc):
             if vis:
                 orden[drog].append(item_card(base_item, vis, drog, False))
         else:
+            _sr = base.get('stock_real', {}) or {}
+            _vt = base.get('ventas', {}) or {}
+            donantes = sorted(
+                [{'sucursal': su, 'stock': int(_sr.get(su, 0))}
+                 for su in _sr if int(_sr.get(su, 0)) > 0 and int(_vt.get(su, 0)) == 0],
+                key=lambda x: -x['stock'])
             orden['SIN_PRECIO'].append({**base_item, 'es_overflow': False,
-                'detalle_suc': detalle, 'drog_code': '',
+                'detalle_suc': detalle, 'drog_code': '', 'donantes': donantes,
                 'sucursales_str': chips_de(detalle)})
 
     conn = get_db()

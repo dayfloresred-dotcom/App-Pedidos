@@ -1,3 +1,4 @@
+{% set DROGLBL = {'SIN_PRECIO': 'Sin stock con rotación'} %}
 {% if not orden %}
   <div class="alert alert-info">No hay solicitudes pendientes para generar orden.</div>
 {% endif %}
@@ -6,7 +7,7 @@
   <div class="col-md-6">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center head-{{ 'sud' if drog == 'SUD' else 'suizo' if drog == 'SUIZO' else 'cd' if drog == 'DROGUERIA RED' else 'sinprecio' }}">
-        <span class="drog-nombre">{{ drog }}</span>
+        <span class="drog-nombre">{{ DROGLBL.get(drog, drog) }}</span>
         <span class="small text-muted">{{ items|length }} productos · {{ items|sum(attribute='total') }} u.</span>
       </div>
       <div class="card-body p-0 card-scroll">
@@ -62,7 +63,11 @@
             <tr class="detalle-{{ rid }}" style="display:none">
               <td colspan="{{ ncols }}" class="detalle-row-bg">
                 <div class="px-2 py-2">
+                  {% if drog == 'SIN_PRECIO' %}
+                  <div class="small text-muted mb-2">No se consigue por droguería. Stock parado (posibles donantes para rotación): {% for don in it.donantes %}<b>{{ don.sucursal }}</b> ({{ don.stock }}){% if not loop.last %} · {% endif %}{% else %}<span class="fst-italic">ninguna sucursal con stock ocioso</span>{% endfor %}</div>
+                  {% else %}
                   <div class="small text-muted mb-2">Cantidad a enviar de cada sucursal desde <b>{{ it.drog_code }}</b>{% if drog == 'DROGUERIA RED' %} (esta cantidad es tambi&eacute;n la del archivo Quantio){% endif %}. La &times; cancela ese producto para esa sucursal:</div>
+                  {% endif %}
                   <div class="d-flex flex-wrap gap-2">
                     {% for d in it.detalle_suc %}
                     <div class="d-flex align-items-center gap-2 pill-suc">
@@ -80,6 +85,13 @@
                         onclick="rotacionItem('{{ it.sku }}','{{ d.sucursal }}', this)">Rotación</button>
                       <button class="btn btn-sm btn-link text-danger p-0" title="Quitar de esta droguería"
                         onclick="omitirItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}')">&times;</button>
+                      {% elif drog == 'SIN_PRECIO' %}
+                      <input type="number" min="0" value="{{ d.cantidad }}" style="width:52px"
+                        class="form-control form-control-sm env-input"
+                        data-sku="{{ it.sku }}" data-sucursal="{{ d.sucursal }}"
+                        title="Unidades a cubrir por rotación">
+                      <button class="btn btn-sm btn-outline-primary py-0 px-2" title="Cubrir por rotación (stock interno)"
+                        onclick="rotacionItem('{{ it.sku }}','{{ d.sucursal }}', this)">Cubrir por rotación</button>
                       {% endif %}
                     </div>
                     {% endfor %}
