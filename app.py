@@ -99,7 +99,11 @@ def ver_solicitud(sol_id):
         flash('Solicitud no encontrada', 'danger')
         return redirect(url_for('mis_pedidos'))
     envios = get_envios_sucursal(sol['sucursal'])
+    export_codes = [code for code in ('CD', 'SUD', 'SUIZO')
+                    if any((envios.get(it['sku'], {}).get(code) or 0) > 0
+                           for it in items if not it.get('cancelado'))]
     return render_template('confirmado.html', sol=sol, items=items, envios=envios,
+        export_codes=export_codes,
         filtro_suc=request.args.get('suc', ''))
 
 @app.route('/confirmado/<int:sol_id>/fragmento')
@@ -144,6 +148,53 @@ def cerrar_forzado(sol_id):
         return jsonify({'error': 'El pedido ya no esta pendiente'}), 400
     n = cerrar_pedido_forzado(sol_id)
     return jsonify({'ok': True, 'n': n})
+
+@app.route('/solicitud/<int:sol_id>/exportar/<drogueria>')
+@login_required
+@admin_required
+def exportar_pedido(sol_id, drogueria):
+    """Descarga el archivo (SUD/Suizo/Quantio) de ESTE pedido desde su detalle, con lo
+    que se cargó en 'Enviar', esté el pedido pendiente o ya cerrado. Sirve para recuperar
+    un pedido que no se llegó a descargar (no depende del filtro de pendientes)."""
+    sol, items = get_solicitud_detalle(sol_id)
+    if not sol:
+        flash('Pedido no encontrado', 'danger'); return redirect(url_for('mis_pedidos'))
+    code = drogueria.upper()
+    if code not in ('CD', 'SUD', 'SUIZO'):
+        flash('Droguería inválida', 'danger'); return redirect(url_for('ver_solicitud', sol_id=sol_id))
+    sucursal = sol['sucursal']
+    prod_map = {p['sku']: p for p in load_productos()}
+    seen, out = set(), []
+    for it in items:
+        if it.get('cancelado'):
+            continue
+        sku = it['sku']
+        if sku in seen:
+            continue
+        seen.add(sku)
+        cant = get_envios(sucursal, sku).get(code, 0) or 0
+        if cant <= 0:
+            continue
+        base = prod_map.get(sku, {})
+        if code == 'CD':
+            troquel = base.get('troquel_pres') or base.get('troquel') or ''
+        else:
+            troquel = base.get('troquel') or '0000000'
+        out.append({'ean': base.get('ean', it.get('ean', '')), 'troquel': troquel,
+                    'descripcion': base.get('descripcion', it.get('descripcion', '')), 'cantidad': cant})
+    if not out:
+        flash(f'Este pedido no tiene unidades cargadas para {code}.', 'warning')
+        return redirect(url_for('ver_solicitud', sol_id=sol_id))
+    suc_slug = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
+    fecha = now_local().strftime('%d%m%y')
+    if code == 'SUIZO':
+        content, fn, mime = generar_suizo(out), f'suizo_{suc_slug}_{fecha}.arg', 'application/octet-stream'
+    elif code == 'SUD':
+        content, fn, mime = generar_sud(out), f'sud_{suc_slug}_{fecha}.dds', 'application/octet-stream'
+    else:
+        content, fn, mime = generar_quantio(out), f'quantio_{suc_slug}_{fecha}.txt', 'text/plain'
+    return Response(content.encode('latin-1', errors='replace'), mimetype=mime,
+        headers={'Content-Disposition': f'attachment; filename="{fn}"'})
 
 # ── Admin only ─────────────────────────────────────────────────────────────
 @app.route('/cumplimiento')

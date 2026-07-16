@@ -29,6 +29,15 @@
         </div>
       </div>
     </div>
+    {% set EXPLBL = {'CD':'Quantio (CD)','SUD':'SUD (.dds)','SUIZO':'SUIZO (.arg)'} %}
+    {% if session.get('rol') == 'admin' and export_codes %}
+    <div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
+      <span class="small text-muted">Descargar archivo del pedido:</span>
+      {% for code in export_codes %}
+      <a class="btn btn-sm btn-suave" href="{{ url_for('exportar_pedido', sol_id=sol.id, drogueria=code) }}">↓ {{ EXPLBL[code] }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
     <div class="tabla-card" id="items-wrap">
       {% include '_confirmado_items.html' %}
     </div>
