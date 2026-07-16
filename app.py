@@ -330,7 +330,7 @@ def _armar_orden(filtro_suc):
             d['nec']     = base.get('necesidad', {}).get(d['sucursal'], 0)
         drog = (p.get('drogueria') or '').upper()
         # Descripcion: la del pedido; si quedo vacia, usar la del catalogo; ultimo recurso, el EAN
-        desc = (p.get('descripcion') or '').strip() or (base.get('descripcion') or '').strip() or (p.get('ean') or '')
+        desc = (base.get('descripcion') or '').strip() or (p.get('descripcion') or '').strip() or (p.get('ean') or '')
         base_item = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext, 'descripcion': desc}
 
         if drog == 'DROGUERIA RED':
