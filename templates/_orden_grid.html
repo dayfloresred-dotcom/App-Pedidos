@@ -104,19 +104,14 @@
           </tbody>
         </table>
       </div>
+      {% if drog == 'SIN_PRECIO' %}
       <div class="card-footer">
-        {% if drog == 'SIN_PRECIO' %}
         <button class="btn btn-sm w-100 btn-peligro"
           onclick="marcarInexistente()">
           ✕ Marcar como producto inexistente
         </button>
-        {% else %}
-        <button class="btn btn-sm w-100 btn-brand"
-          onclick="marcarComprado('{{ drog }}')">
-          ✓ Marcar {{ drog }} como comprado
-        </button>
-        {% endif %}
       </div>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
