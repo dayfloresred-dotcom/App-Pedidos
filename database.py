@@ -406,6 +406,24 @@ def marcar_comprado_drogueria(drogueria, fecha):
     conn.close()
     return n
 
+def cerrar_pedido_forzado(sol_id):
+    """Cierra un pedido a la fuerza: los items que aun no estaban comprados quedan
+    marcados como comprados ('Pedido realizado'), aunque no se hayan enviado todas las
+    unidades pedidas. Recalcula el estado de la solicitud (pasa a 'comprado').
+    Devuelve la cantidad de items afectados."""
+    conn = get_db()
+    fecha = now_local().strftime('%d/%m/%Y')
+    cur = conn.execute(
+        "UPDATE items_solicitud SET comprado=1, fecha_orden=COALESCE(fecha_orden, ?) "
+        "WHERE solicitud_id=? AND cancelado=0 AND comprado=0",
+        (fecha, sol_id))
+    n = cur.rowcount
+    _recalc_estado_solicitud(conn, sol_id)
+    conn.commit()
+    conn.close()
+    return n
+
+
 def marcar_inexistente(sku):
     """Marca un producto sin precio como inexistente: cancelado + origen 'INEXISTENTE'."""
     conn = get_db()

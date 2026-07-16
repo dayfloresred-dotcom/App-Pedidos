@@ -40,6 +40,9 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-sm btn-outline-danger">✕ Cancelar pedido completo</button>
         </form>
+        {% if session.get('rol') == 'admin' %}
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="cerrarForzado()">✓ Forzar cierre del pedido</button>
+        {% endif %}
         {% endif %}
       </div>
       <div>
@@ -73,6 +76,18 @@ async function restaurarItem(itemId) {
   const d = await res.json().catch(() => ({}));
   if (res.ok && d.ok) { toast('Producto restaurado', 'exito'); refrescarItems(); }
   else toast(d.error || 'No se pudo restaurar', 'error');
+}
+
+async function cerrarForzado() {
+  const ok = await confirmar('Las unidades que no se enviaron quedarán como \'Pedido realizado\' y el pedido dejará de figurar como pendiente.',
+    {titulo: '¿Forzar el cierre del pedido?', accion: 'Forzar cierre', peligro: false});
+  if (!ok) return;
+  const res = await fetch(location.pathname.replace('/confirmado/', '/solicitud/') + '/cerrar-forzado', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+  });
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) { toast('Pedido cerrado', 'exito'); setTimeout(() => location.reload(), 600); }
+  else toast(d.error || 'No se pudo cerrar el pedido', 'error');
 }
 
 async function refrescarItems() {

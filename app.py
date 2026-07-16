@@ -7,7 +7,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        get_db, actualizar_droguerias_pendientes,
                        get_items_detalle, marcar_item_generado, desmarcar_item_generado,
                        cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal,
-                       marcar_comprado_drogueria, marcar_inexistente,
+                       marcar_comprado_drogueria, marcar_inexistente, cerrar_pedido_forzado,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
                        get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item,
                        actualizar_comprado_por_envio,
@@ -131,6 +131,19 @@ def cancelar(sol_id):
     cancelar_solicitud(sol_id)
     flash(f'Pedido {sol["numero"]} cancelado', 'warning')
     return redirect(url_for('mis_pedidos'))
+
+@app.route('/solicitud/<int:sol_id>/cerrar-forzado', methods=['POST'])
+@login_required
+@admin_required
+def cerrar_forzado(sol_id):
+    """Cierra el pedido dejando lo no enviado como 'Pedido realizado' (decision del admin)."""
+    sol, _ = get_solicitud_detalle(sol_id)
+    if not sol:
+        return jsonify({'error': 'Pedido no encontrado'}), 404
+    if sol['estado'] != 'pendiente':
+        return jsonify({'error': 'El pedido ya no esta pendiente'}), 400
+    n = cerrar_pedido_forzado(sol_id)
+    return jsonify({'ok': True, 'n': n})
 
 # ── Admin only ─────────────────────────────────────────────────────────────
 @app.route('/cumplimiento')
