@@ -195,24 +195,6 @@ async function omitirProducto(sku, code) {
   else toast(d.error || 'No se pudo quitar', 'error');
 }
 
-async function marcarComprado(drog) {
-  const ok = await confirmar('Los productos pendientes de esta droguería pasan a comprados y salen de la orden.',
-    {titulo: `¿Marcar ${drog} como comprado?`, accion: 'Marcar comprado', peligro: false});
-  if (!ok) return;
-  const hoy = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
-  const res = await fetch('/api/orden/comprado', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({drogueria: drog, fecha: hoy})
-  });
-  const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) {
-    toast(`${drog}: ${d.n} producto(s) marcados como comprados`, 'exito');
-    refrescarOrden();
-  } else {
-    toast(d.error || 'No se pudo marcar', 'error');
-  }
-}
 
 async function marcarInexistente() {
   const skus = [];
