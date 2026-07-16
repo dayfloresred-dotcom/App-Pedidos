@@ -175,13 +175,22 @@ def get_solicitud_detalle(sol_id):
         return None, []
     return dict(sol), [dict(i) for i in items]
 
-def get_todas_solicitudes(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None):
+def get_todas_solicitudes(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None, q_filtro=None):
     conn = get_db()
     query = 'SELECT s.*, COUNT(i.id) as n_items FROM solicitudes s LEFT JOIN items_solicitud i ON i.solicitud_id=s.id AND i.cancelado=0'
     params = []
     wheres = []
     if sucursal_filtro:
         wheres.append('s.sucursal=?'); params.append(sucursal_filtro)
+    if drogueria_filtro:
+        wheres.append("EXISTS (SELECT 1 FROM items_solicitud di WHERE di.solicitud_id=s.id "
+                      "AND di.cancelado=0 AND di.drogueria_final=?)")
+        params.append(drogueria_filtro)
+    if q_filtro:
+        like = f'%{q_filtro}%'
+        wheres.append("EXISTS (SELECT 1 FROM items_solicitud qi WHERE qi.solicitud_id=s.id "
+                      "AND qi.cancelado=0 AND (qi.descripcion LIKE ? OR qi.ean LIKE ? OR qi.sku LIKE ?))")
+        params += [like, like, like]
     if wheres:
         query += ' WHERE ' + ' AND '.join(wheres)
     query += ' GROUP BY s.id ORDER BY s.id DESC'

@@ -25,7 +25,11 @@
       <div class="col-4">
         <div class="metric-card">
           <div class="metric-label">Fecha de compra</div>
+          {% if sol.fecha_compra %}
+          <div class="metric-valor fs-6">{{ sol.fecha_compra }}</div>
+          {% else %}
           <div class="text-muted fst-italic small">Pendiente de compra…</div>
+          {% endif %}
         </div>
       </div>
     </div>

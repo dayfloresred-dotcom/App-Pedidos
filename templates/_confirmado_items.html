@@ -4,13 +4,14 @@
 <div class="table-responsive">
 <table class="table table-sm">
   <thead><tr>
-    <th>EAN</th><th>Producto</th><th>Laboratorio</th>
+    <th>SKU</th><th>EAN</th><th>Producto</th><th>Laboratorio</th>
     <th class="text-center">Solicitado</th><th class="text-center">Enviado</th><th class="text-center">Estado</th>
     <th class="text-center">Llega desde</th><th></th>
   </tr></thead>
   <tbody>
     {% for it in items %}
     <tr {% if it.cancelado %}style="opacity:.6"{% endif %}>
+      <td class="text-muted small">{{ it.sku }}</td>
       <td class="text-muted small">{{ it.ean }}</td>
       <td>{{ it.descripcion }}{% if it.observacion %}<div class="small fst-italic" style="color:#9a3412">📝 {{ it.observacion }}</div>{% endif %}</td>
       <td>{{ it.laboratorio }}</td>

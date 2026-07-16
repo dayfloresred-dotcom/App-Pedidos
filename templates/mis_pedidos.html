@@ -3,20 +3,34 @@
 <h5 class="mb-3">
   {% if session.get('rol') == 'admin' %}Todas las solicitudes{% else %}Mis pedidos{% endif %}
 </h5>
-{% if session.get('rol') == 'admin' %}
 <div class="filter-bar mb-3">
   <form method="get" class="row g-2 align-items-end">
+    {% if session.get('rol') == 'admin' %}
     <div class="col-auto">
-      <select name="suc" class="form-select form-select-sm" style="width:200px">
+      <label class="form-label small mb-1">Sucursal</label>
+      <select name="suc" class="form-select form-select-sm" style="width:190px">
         <option value="">Todas las sucursales</option>
         {% for s in sucursales %}<option value="{{ s }}" {% if filtro_suc==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
       </select>
     </div>
+    {% endif %}
+    <div class="col-auto">
+      <label class="form-label small mb-1">Droguería</label>
+      <select name="drog" class="form-select form-select-sm" style="width:170px">
+        <option value="">Todas</option>
+        <option value="CD" {% if filtro_drog=='CD' %}selected{% endif %}>Droguería Red (CD)</option>
+        <option value="SUD" {% if filtro_drog=='SUD' %}selected{% endif %}>Sud</option>
+        <option value="SUIZO" {% if filtro_drog=='SUIZO' %}selected{% endif %}>Suizo</option>
+        <option value="ROT" {% if filtro_drog=='ROT' %}selected{% endif %}>Rotación</option>
+      </select>
+    </div>
+    <div class="col-auto">
+      <label class="form-label small mb-1">Producto o EAN</label>
+      <input type="text" name="q" value="{{ filtro_q }}" class="form-control form-control-sm" style="width:220px" placeholder="Nombre o código">
+    </div>
     <div class="col-auto"><button class="btn btn-sm btn-brand">Filtrar</button></div>
-    {% if filtro_suc %}<div class="col-auto"><a href="{{ url_for('mis_pedidos') }}" class="btn btn-sm btn-outline-secondary">Limpiar</a></div>{% endif %}
   </form>
 </div>
-{% endif %}
 <div class="tabla-card">
 <table class="table table-sm table-hover">
   <thead><tr>
