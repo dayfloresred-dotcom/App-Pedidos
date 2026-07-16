@@ -96,10 +96,25 @@ def mis_pedidos():
         solicitudes=solic, sucursales=SUCURSAL_NAMES, laboratorios=get_laboratorios(),
         filtro_suc=filtro_suc, filtro_drog=filtro_drog, filtro_q=filtro_q, filtro_lab=filtro_lab)
 
+def _completar_descripciones(items):
+    """Completa/actualiza la descripcion de cada item con la del catalogo (nombre
+    completo); si el producto no esta en el catalogo, deja la guardada o el EAN.
+    Evita nombres cortados o vacios en el detalle del pedido."""
+    prod_map = {p['sku']: p for p in load_productos()}
+    for it in items:
+        cat = (prod_map.get(it['sku'], {}).get('descripcion') or '').strip()
+        if cat:
+            it['descripcion'] = cat
+        elif not (it.get('descripcion') or '').strip():
+            it['descripcion'] = it.get('ean') or ''
+    return items
+
+
 @app.route('/confirmado/<int:sol_id>')
 @login_required
 def ver_solicitud(sol_id):
     sol, items = get_solicitud_detalle(sol_id)
+    items = _completar_descripciones(items)
     items = sorted(items, key=lambda i: (i.get('descripcion') or '').upper())
     if not sol:
         flash('Solicitud no encontrada', 'danger')
@@ -116,6 +131,7 @@ def ver_solicitud(sol_id):
 @login_required
 def ver_solicitud_fragmento(sol_id):
     sol, items = get_solicitud_detalle(sol_id)
+    items = _completar_descripciones(items)
     items = sorted(items, key=lambda i: (i.get('descripcion') or '').upper())
     if not sol:
         return 'No encontrada', 404
