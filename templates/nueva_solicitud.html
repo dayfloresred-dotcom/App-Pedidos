@@ -10,7 +10,7 @@
 {% if session.get('rol') == 'admin' %}
 <div class="mb-3 d-flex align-items-center gap-2 filter-bar">
   <label class="form-label mb-0 small fw-bold">Crear en nombre de:</label>
-  <select id="sel-sucursal" class="form-select form-select-sm" style="width:220px" onchange="loadCart()">
+  <select id="sel-sucursal" class="form-select form-select-sm" style="width:220px" onchange="loadCart(); guardarFiltros()">
     <option value="">— Seleccioná una sucursal —</option>
     {% for s in sucursales %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
   </select>
@@ -95,6 +95,7 @@ async function buscar() {
   const lab = document.getElementById('inp-lab').value;
   const q   = document.getElementById('inp-q').value;
   if (!lab && !q) { toast('Ingresá laboratorio o nombre de producto', 'info'); return; }
+  guardarFiltros();
   const res  = await fetch(`/api/productos?q=${encodeURIComponent(q)}&lab=${encodeURIComponent(lab)}&suc=${encodeURIComponent(suc)}`);
   allResults = await res.json();
   page = 1;
@@ -186,6 +187,28 @@ async function setObs(sku, obs) {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.id==='inp-lab' || e.target.id==='inp-q')) buscar(); });
-window.addEventListener('DOMContentLoaded', loadCart);
+function guardarFiltros() {
+  try {
+    sessionStorage.setItem('ns_filtros', JSON.stringify({
+      lab: document.getElementById('inp-lab').value,
+      q: document.getElementById('inp-q').value,
+      suc: (ROL === 'admin' && document.getElementById('sel-sucursal')) ? document.getElementById('sel-sucursal').value : ''
+    }));
+  } catch (e) {}
+}
+
+async function initNuevaSolicitud() {
+  let f = {};
+  try { f = JSON.parse(sessionStorage.getItem('ns_filtros') || '{}'); } catch (e) {}
+  if (ROL === 'admin' && f.suc) {
+    const sel = document.getElementById('sel-sucursal');
+    if (sel) sel.value = f.suc;
+  }
+  if (f.lab) document.getElementById('inp-lab').value = f.lab;
+  if (f.q) document.getElementById('inp-q').value = f.q;
+  await loadCart();
+  if (f.lab || f.q) buscar();
+}
+window.addEventListener('DOMContentLoaded', initNuevaSolicitud);
 </script>
 {% endblock %}
