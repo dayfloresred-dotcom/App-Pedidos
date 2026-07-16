@@ -78,21 +78,23 @@ def nueva_solicitud():
 def mis_pedidos():
     # Recuerda los filtros (sucursal + drogueria + producto) en la sesion: si vienen
     # en la URL los guarda; si no (al volver por el menu) reusa los ultimos.
-    if any(k in request.args for k in ('suc', 'drog', 'q')):
+    if any(k in request.args for k in ('suc', 'drog', 'q', 'lab')):
         filtro_suc  = request.args.get('suc', '')
         filtro_drog = request.args.get('drog', '')
         filtro_q    = request.args.get('q', '').strip()
-        session['mis_pedidos_filtros'] = {'suc': filtro_suc, 'drog': filtro_drog, 'q': filtro_q}
+        filtro_lab  = request.args.get('lab', '').strip()
+        session['mis_pedidos_filtros'] = {'suc': filtro_suc, 'drog': filtro_drog, 'q': filtro_q, 'lab': filtro_lab}
     else:
         f = session.get('mis_pedidos_filtros', {})
-        filtro_suc, filtro_drog, filtro_q = f.get('suc', ''), f.get('drog', ''), f.get('q', '')
+        filtro_suc, filtro_drog, filtro_q, filtro_lab = f.get('suc',''), f.get('drog',''), f.get('q',''), f.get('lab','')
     suc = filtro_suc if session.get('rol') == 'admin' else session['username']
     solic = get_todas_solicitudes(sucursal_filtro=suc or None,
                                   drogueria_filtro=filtro_drog or None,
-                                  q_filtro=filtro_q or None)
+                                  q_filtro=filtro_q or None,
+                                  lab_filtro=filtro_lab or None)
     return render_template('mis_pedidos.html',
-        solicitudes=solic, sucursales=SUCURSAL_NAMES,
-        filtro_suc=filtro_suc, filtro_drog=filtro_drog, filtro_q=filtro_q)
+        solicitudes=solic, sucursales=SUCURSAL_NAMES, laboratorios=get_laboratorios(),
+        filtro_suc=filtro_suc, filtro_drog=filtro_drog, filtro_q=filtro_q, filtro_lab=filtro_lab)
 
 @app.route('/confirmado/<int:sol_id>')
 @login_required

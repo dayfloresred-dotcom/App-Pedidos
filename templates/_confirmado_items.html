@@ -26,7 +26,7 @@
         {% endif %}
       </td>
       <td class="text-center">
-        {% if it.cancelado %}
+        {% if it.cancelado or sol.estado == 'cancelado' %}
           <span class="badge-cancelado">✕ Cancelado</span>
         {% elif it.comprado %}
           <span class="badge-comprado">✓ Pedido realizado</span>

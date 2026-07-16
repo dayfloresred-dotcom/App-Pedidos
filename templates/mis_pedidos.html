@@ -25,6 +25,11 @@
       </select>
     </div>
     <div class="col-auto">
+      <label class="form-label small mb-1">Laboratorio</label>
+      <input type="text" name="lab" value="{{ filtro_lab }}" list="mp-lab-list" class="form-control form-control-sm" style="width:180px" placeholder="Laboratorio">
+      <datalist id="mp-lab-list">{% for l in laboratorios %}<option value="{{ l }}">{% endfor %}</datalist>
+    </div>
+    <div class="col-auto">
       <label class="form-label small mb-1">Producto o EAN</label>
       <input type="text" name="q" value="{{ filtro_q }}" class="form-control form-control-sm" style="width:220px" placeholder="Nombre o código">
     </div>

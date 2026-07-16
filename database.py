@@ -182,6 +182,10 @@ def get_todas_solicitudes(sucursal_filtro=None, lab_filtro=None, drogueria_filtr
     wheres = []
     if sucursal_filtro:
         wheres.append('s.sucursal=?'); params.append(sucursal_filtro)
+    if lab_filtro:
+        wheres.append("EXISTS (SELECT 1 FROM items_solicitud li WHERE li.solicitud_id=s.id "
+                      "AND li.cancelado=0 AND li.laboratorio LIKE ?)")
+        params.append(f'%{lab_filtro}%')
     if drogueria_filtro:
         wheres.append("EXISTS (SELECT 1 FROM items_solicitud di WHERE di.solicitud_id=s.id "
                       "AND di.cancelado=0 AND di.drogueria_final=?)")
@@ -735,10 +739,12 @@ def carrito_clear(sucursal):
 
 def cancelar_solicitud(sol_id):
     conn = get_db()
-    conn.execute(
-        'UPDATE solicitudes SET estado=? WHERE id=? AND estado=?',
-        ('cancelado', sol_id, 'pendiente')
+    cur = conn.execute(
+        "UPDATE solicitudes SET estado='cancelado' WHERE id=? AND estado='pendiente'", (sol_id,)
     )
+    if cur.rowcount:
+        # que los productos del detalle tambien queden como cancelados
+        conn.execute('UPDATE items_solicitud SET cancelado=1 WHERE solicitud_id=? AND cancelado=0', (sol_id,))
     conn.commit()
     conn.close()
 
