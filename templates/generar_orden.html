@@ -196,6 +196,17 @@ async function omitirProducto(sku, code) {
 }
 
 
+async function moverItem(sku, suc, code) {
+  if (!code) return;
+  const res = await fetch('/api/orden/mover', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sku, sucursal: suc, drogueria: code})
+  });
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) { toast('Producto movido de tarjeta', 'exito'); refrescarOrden(); }
+  else toast(d.error || 'No se pudo mover', 'error');
+}
+
 async function cancelarItemSuc(sku, suc) {
   const ok = await confirmar(`Se cancela ${suc} para este producto (las demás sucursales quedan igual).`,
     {titulo: '¿Cancelar para esta sucursal?', accion: 'Cancelar'});

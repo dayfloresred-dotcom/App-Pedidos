@@ -98,6 +98,14 @@
                       <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar para esta sucursal"
                         onclick="cancelarItemSuc('{{ it.sku }}','{{ d.sucursal }}')">&times;</button>
                       {% endif %}
+                      <select class="form-select form-select-sm d-inline-block" style="width:auto"
+                        title="Mover esta sucursal a otra droguería"
+                        onchange="moverItem('{{ it.sku }}','{{ d.sucursal }}', this.value)">
+                        <option value="">Mover a…</option>
+                        {% if drog != 'DROGUERIA RED' %}<option value="CD">Droguería Red</option>{% endif %}
+                        {% if drog != 'SUD' %}<option value="SUD">SUD</option>{% endif %}
+                        {% if drog != 'SUIZO' %}<option value="SUIZO">Suizo</option>{% endif %}
+                      </select>
                     </div>
                     {% endfor %}
                   </div>

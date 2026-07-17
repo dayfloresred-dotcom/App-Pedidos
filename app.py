@@ -5,7 +5,7 @@ from config import SECRET_KEY, SUCURSAL_NAMES, ADMIN_USER, now_local, local_from
 from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas_solicitudes,
                        get_consolidado, get_detalle_por_sucursal, marcar_comprado, cancelar_solicitud,
                        get_db, actualizar_droguerias_pendientes,
-                       get_items_detalle, marcar_item_generado, desmarcar_item_generado,
+                       get_items_detalle, marcar_item_generado, desmarcar_item_generado, mover_item_sucursal,
                        cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal,
                        marcar_comprado_drogueria, marcar_inexistente, cerrar_pedido_forzado,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
@@ -328,33 +328,40 @@ def _armar_orden(filtro_suc):
             d['stock']   = base.get('stock_real', {}).get(d['sucursal'], 0)
             d['venta']   = base.get('ventas', {}).get(d['sucursal'], 0)
             d['nec']     = base.get('necesidad', {}).get(d['sucursal'], 0)
-        drog = (p.get('drogueria') or '').upper()
         # Descripcion: la del pedido; si quedo vacia, usar la del catalogo; ultimo recurso, el EAN
         desc = (base.get('descripcion') or '').strip() or (p.get('descripcion') or '').strip() or (p.get('ean') or '')
         base_item = {**p, 'sucursales_str': chips, 'stock_cd': stock_cd, 'drog_ext': drog_ext, 'descripcion': desc}
 
-        if drog == 'DROGUERIA RED':
-            vis_cd = visibles(detalle, sku, 'CD')
-            if vis_cd:
-                orden['DROGUERIA RED'].append(item_card(base_item, vis_cd, 'CD', False))
-            if drog_ext in ('SUD', 'SUIZO') and (p['total'] - stock_cd) > 0:
-                vis_ext = visibles(detalle, sku, drog_ext)
-                if vis_ext:
-                    orden[drog_ext].append(item_card(base_item, vis_ext, drog_ext, True))
-        elif drog in ('SUD', 'SUIZO'):
-            vis = visibles(detalle, sku, drog)
-            if vis:
-                orden[drog].append(item_card(base_item, vis, drog, False))
-        else:
-            _sr = base.get('stock_real', {}) or {}
-            _vt = base.get('ventas', {}) or {}
-            donantes = sorted(
-                [{'sucursal': su, 'stock': int(_sr.get(su, 0))}
-                 for su in _sr if int(_sr.get(su, 0)) > 0 and int(_vt.get(su, 0)) == 0],
-                key=lambda x: -x['stock'])
-            orden['SIN_PRECIO'].append({**base_item, 'es_overflow': False,
-                'detalle_suc': detalle, 'drog_code': '', 'donantes': donantes,
-                'sucursales_str': chips_de(detalle)})
+        # Rutear por la droguería de CADA sucursal (permite mover líneas de a una).
+        # Si todas las sucursales comparten droguería, el resultado es igual al anterior.
+        por_drog = {}
+        for d in detalle:
+            por_drog.setdefault((d.get('drogueria') or '').upper(), []).append(d)
+
+        for code_drog, dets in por_drog.items():
+            if code_drog == 'DROGUERIA RED':
+                vis_cd = visibles(dets, sku, 'CD')
+                if vis_cd:
+                    orden['DROGUERIA RED'].append(item_card(base_item, vis_cd, 'CD', False))
+                grp_total = sum(d['cantidad'] for d in dets)
+                if drog_ext in ('SUD', 'SUIZO') and (grp_total - stock_cd) > 0:
+                    vis_ext = visibles(dets, sku, drog_ext)
+                    if vis_ext:
+                        orden[drog_ext].append(item_card(base_item, vis_ext, drog_ext, True))
+            elif code_drog in ('SUD', 'SUIZO'):
+                vis = visibles(dets, sku, code_drog)
+                if vis:
+                    orden[code_drog].append(item_card(base_item, vis, code_drog, False))
+            else:
+                _sr = base.get('stock_real', {}) or {}
+                _vt = base.get('ventas', {}) or {}
+                donantes = sorted(
+                    [{'sucursal': su, 'stock': int(_sr.get(su, 0))}
+                     for su in _sr if int(_sr.get(su, 0)) > 0 and int(_vt.get(su, 0)) == 0],
+                    key=lambda x: -x['stock'])
+                orden['SIN_PRECIO'].append({**base_item, 'es_overflow': False,
+                    'detalle_suc': dets, 'drog_code': '', 'donantes': donantes,
+                    'sucursales_str': chips_de(dets)})
 
     conn = get_db()
     sucs_set = {r['sucursal'] for r in conn.execute(
@@ -651,6 +658,21 @@ def api_cancelar_item_id():
     if session.get('rol') != 'admin' and session.get('username') != suc:
         return jsonify({'error': 'Sin permiso'}), 403
     cancelar_item(item_id)
+    return jsonify({'ok': True})
+
+@app.route('/api/orden/mover', methods=['POST'])
+@login_required
+@admin_required
+def api_mover():
+    """Mueve la línea de UNA sucursal de un producto a otra droguería (tarjeta)."""
+    data = request.get_json(silent=True) or {}
+    sku  = str(data.get('sku') or '').strip()
+    suc  = (data.get('sucursal') or '').strip()
+    code = (data.get('drogueria') or '').strip().upper()
+    MAP  = {'CD': 'DROGUERIA RED', 'DROGUERIA RED': 'DROGUERIA RED', 'SUD': 'SUD', 'SUIZO': 'SUIZO'}
+    if not (sku and suc) or code not in MAP:
+        return jsonify({'error': 'Faltan datos'}), 400
+    mover_item_sucursal(sku, suc, MAP[code])
     return jsonify({'ok': True})
 
 @app.route('/api/orden/rotacion', methods=['POST'])

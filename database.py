@@ -241,7 +241,7 @@ def get_items_detalle(sku):
     ordenado=1 solo si TODOS los ítems de esa sucursal+sku están generados."""
     conn = get_db()
     rows = conn.execute('''
-        SELECT s.sucursal,
+        SELECT s.sucursal, i.drogueria AS drogueria,
                SUM(i.cantidad)        as cantidad,
                MIN(i.ordenado)        as ordenado,
                MAX(i.drogueria_final) as drogueria_final,
@@ -249,11 +249,23 @@ def get_items_detalle(sku):
         FROM items_solicitud i
         JOIN solicitudes s ON s.id = i.solicitud_id
         WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0 AND i.comprado=0
-        GROUP BY s.sucursal
+        GROUP BY s.sucursal, i.drogueria
         ORDER BY s.sucursal
     ''', (sku,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def mover_item_sucursal(sku, sucursal, drogueria):
+    """Cambia la droguería (tarjeta) de los ítems pendientes de un producto para UNA sucursal.
+    Permite mover la línea de una sucursal a otra droguería sin tocar a las demás."""
+    conn = get_db()
+    conn.execute('''
+        UPDATE items_solicitud SET drogueria=?
+        WHERE sku=? AND cancelado=0 AND comprado=0
+          AND solicitud_id IN (SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente')
+    ''', (drogueria, sku, sucursal))
+    conn.commit()
+    conn.close()
 
 def marcar_item_generado(sku, sucursal, drogueria, fecha):
     """Marca como generado el pedido de un producto para una sucursal puntual."""
