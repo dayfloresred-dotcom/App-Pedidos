@@ -196,6 +196,19 @@ async function omitirProducto(sku, code) {
 }
 
 
+async function cancelarProducto(sku) {
+  const ok = await confirmar('Se cancela para todas las sucursales y queda como cancelado en el pedido.',
+    {titulo: '¿Cancelar este producto?', accion: 'Cancelar producto'});
+  if (!ok) return;
+  const res = await fetch('/api/orden/cancelar-producto', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sku})
+  });
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) { toast('Producto cancelado', 'exito'); refrescarOrden(); }
+  else toast(d.error || 'No se pudo cancelar', 'error');
+}
+
 async function marcarInexistente() {
   const skus = [];
   document.querySelectorAll('.qty-input[data-drog="SIN_PRECIO"]').forEach(inp => skus.push(inp.dataset.sku));
