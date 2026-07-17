@@ -95,6 +95,8 @@
                         title="Unidades a cubrir por rotación">
                       <button class="btn btn-sm btn-outline-primary py-0 px-2" title="Cubrir por rotación (stock interno)"
                         onclick="rotacionItem('{{ it.sku }}','{{ d.sucursal }}', this)">Cubrir por rotación</button>
+                      <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar para esta sucursal"
+                        onclick="cancelarItemSuc('{{ it.sku }}','{{ d.sucursal }}')">&times;</button>
                       {% endif %}
                     </div>
                     {% endfor %}
