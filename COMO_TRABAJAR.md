@@ -30,6 +30,10 @@ Somos dos (o más) trabajando sobre el mismo repositorio de GitHub
 - El deploy es: `git pull` dentro de `/opt/App-Pedidos` + rebuild del
   contenedor. Eso lo maneja quien tenga acceso SSH (coordinar con Ezequiel).
   Detalle completo en `docs/2026-07-02-migracion-vps.md`.
+- **Atajo:** desde tu máquina (con acceso SSH por clave al VPS) corré
+  `./deploy.sh`. Hace el `git pull`, el rebuild del contenedor `pedidos` y
+  verifica que producción responda. Acordate de pushear los cambios a
+  `origin/main` antes: el script NO pushea, solo publica lo que ya está en GitHub.
 
 ## Si aparece un conflicto
 - Si GitHub Desktop dice que no puede hacer *Pull/Push* por cambios encontrados,
