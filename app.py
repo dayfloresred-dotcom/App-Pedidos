@@ -6,7 +6,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        get_consolidado, get_detalle_por_sucursal, marcar_comprado, cancelar_solicitud,
                        get_db, actualizar_droguerias_pendientes,
                        get_items_detalle, marcar_item_generado, desmarcar_item_generado, mover_item_sucursal,
-                       cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal,
+                       cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal, marcar_sin_necesidad,
                        marcar_comprado_drogueria, marcar_inexistente, cerrar_pedido_forzado,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
                        get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item,
@@ -617,6 +617,19 @@ def api_desmarcar_item():
     if not (sku and suc):
         return jsonify({'error': 'Faltan datos'}), 400
     desmarcar_item_generado(sku, suc)
+    return jsonify({'ok': True})
+
+@app.route('/api/orden/sin-necesidad', methods=['POST'])
+@login_required
+@admin_required
+def api_sin_necesidad():
+    """Saca un producto de la orden por 'sin necesidad' (cancelado con ese motivo). Con sucursal, solo esa."""
+    data = request.get_json(silent=True) or {}
+    sku = str(data.get('sku') or '').strip()
+    suc = (data.get('sucursal') or '').strip() or None
+    if not sku:
+        return jsonify({'error': 'Falta sku'}), 400
+    marcar_sin_necesidad(sku, suc)
     return jsonify({'ok': True})
 
 @app.route('/api/orden/cancelar-producto', methods=['POST'])

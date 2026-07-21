@@ -54,6 +54,8 @@ def init_db():
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN comprado INTEGER NOT NULL DEFAULT 0")
     if 'observacion' not in cols:
         conn.execute("ALTER TABLE items_solicitud ADD COLUMN observacion TEXT")
+    if 'sin_necesidad' not in cols:
+        conn.execute("ALTER TABLE items_solicitud ADD COLUMN sin_necesidad INTEGER NOT NULL DEFAULT 0")
     conn.execute('''
         CREATE TABLE IF NOT EXISTS carrito (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -315,7 +317,7 @@ def cancelar_producto(sku):
         WHERE i.sku=? AND s.estado='pendiente'
     ''', (sku,)).fetchall()]
     conn.execute('''
-        UPDATE items_solicitud SET cancelado=1
+        UPDATE items_solicitud SET cancelado=1, sin_necesidad=0
         WHERE sku=? AND solicitud_id IN (SELECT id FROM solicitudes WHERE estado='pendiente')
     ''', (sku,))
     for sid in sols:
@@ -330,7 +332,7 @@ def cancelar_producto_sucursal(sku, sucursal):
         "SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'", (sucursal,)
     ).fetchall()]
     conn.execute('''
-        UPDATE items_solicitud SET cancelado=1
+        UPDATE items_solicitud SET cancelado=1, sin_necesidad=0
         WHERE sku=? AND solicitud_id IN (
             SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'
         )
@@ -360,7 +362,7 @@ def restaurar_item(item_id):
     if not row:
         conn.close()
         return None
-    conn.execute("UPDATE items_solicitud SET cancelado=0 WHERE id=?", (item_id,))
+    conn.execute("UPDATE items_solicitud SET cancelado=0, sin_necesidad=0 WHERE id=?", (item_id,))
     conn.execute("UPDATE solicitudes SET estado='pendiente', fecha_compra=NULL WHERE id=? AND estado='cancelado'", (row['solicitud_id'],))
     conn.commit()
     conn.close()
@@ -448,6 +450,27 @@ def cerrar_pedido_forzado(sol_id):
     conn.close()
     return n
 
+
+def marcar_sin_necesidad(sku, sucursal=None):
+    """Saca un producto de la orden por 'sin necesidad' (queda cancelado con ese motivo).
+    Con sucursal=None aplica a todas las sucursales pendientes; si se pasa, solo a esa."""
+    conn = get_db()
+    if sucursal:
+        sols = [r['id'] for r in conn.execute(
+            "SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'", (sucursal,)).fetchall()]
+        conn.execute('''UPDATE items_solicitud SET cancelado=1, sin_necesidad=1
+            WHERE sku=? AND solicitud_id IN (SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente')''',
+            (sku, sucursal))
+    else:
+        sols = [r['id'] for r in conn.execute('''SELECT DISTINCT s.id FROM solicitudes s
+            JOIN items_solicitud i ON i.solicitud_id=s.id
+            WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0''', (sku,)).fetchall()]
+        conn.execute('''UPDATE items_solicitud SET cancelado=1, sin_necesidad=1
+            WHERE sku=? AND solicitud_id IN (SELECT id FROM solicitudes WHERE estado='pendiente')''', (sku,))
+    for sid in sols:
+        _recalc_estado_solicitud(conn, sid)
+    conn.commit()
+    conn.close()
 
 def marcar_inexistente(sku):
     """Marca un producto sin precio como inexistente: cancelado + origen 'INEXISTENTE'."""

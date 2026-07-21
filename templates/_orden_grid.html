@@ -53,12 +53,9 @@
                 {% if it.es_overflow %}
                 <button class="btn btn-sm btn-link text-secondary p-0" title="Ocultar"
                   onclick="this.closest('tr').remove()">&times;</button>
-                {% elif drog == 'SIN_PRECIO' %}
-                <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar producto"
-                  onclick="cancelarProducto('{{ it.sku }}')">&times;</button>
                 {% else %}
-                <button class="btn btn-sm btn-link text-danger p-0" title="Quitar producto de esta droguería"
-                  onclick="omitirProducto('{{ it.sku }}','{{ it.drog_code }}')">&times;</button>
+                <button class="btn btn-sm btn-link text-danger p-0" title="Quitar / cancelar / sin necesidad"
+                  onclick="accionProducto('{{ it.sku }}','{{ it.drog_code }}','{{ drog }}')">&times;</button>
                 {% endif %}
               </td>
             </tr>
@@ -86,8 +83,8 @@
                         onclick="enviarItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}', this)">Enviar</button>
                       <button class="btn btn-sm btn-outline-primary py-0 px-2" title="Cubrir por rotación (stock interno)"
                         onclick="rotacionItem('{{ it.sku }}','{{ d.sucursal }}', this)">Rotación</button>
-                      <button class="btn btn-sm btn-link text-danger p-0" title="Quitar de esta droguería"
-                        onclick="omitirItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}')">&times;</button>
+                      <button class="btn btn-sm btn-link text-danger p-0" title="Quitar / cancelar / sin necesidad"
+                        onclick="accionItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}','{{ drog }}')">&times;</button>
                       {% elif drog == 'SIN_PRECIO' %}
                       <input type="number" min="0" value="{{ d.cantidad }}" style="width:52px"
                         class="form-control form-control-sm env-input"
@@ -95,8 +92,8 @@
                         title="Unidades a cubrir por rotación">
                       <button class="btn btn-sm btn-outline-primary py-0 px-2" title="Cubrir por rotación (stock interno)"
                         onclick="rotacionItem('{{ it.sku }}','{{ d.sucursal }}', this)">Cubrir por rotación</button>
-                      <button class="btn btn-sm btn-link text-danger p-0" title="Cancelar para esta sucursal"
-                        onclick="cancelarItemSuc('{{ it.sku }}','{{ d.sucursal }}')">&times;</button>
+                      <button class="btn btn-sm btn-link text-danger p-0" title="Quitar / cancelar / sin necesidad"
+                        onclick="accionItem('{{ it.sku }}','{{ d.sucursal }}','','SIN_PRECIO')">&times;</button>
                       {% endif %}
                       <select class="form-select form-select-sm d-inline-block" style="width:auto"
                         title="Mover esta sucursal a otra droguería"

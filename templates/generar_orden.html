@@ -220,6 +220,39 @@ async function cancelarItemSuc(sku, suc) {
   else toast(d.error || 'No se pudo cancelar', 'error');
 }
 
+async function _accionPost(url, body) {
+  const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) { toast('Listo', 'exito'); refrescarOrden(); }
+  else toast(d.error || 'No se pudo', 'error');
+}
+
+function _opcionesQuitar(drog, code) {
+  const ops = [];
+  if (drog !== 'SIN_PRECIO' && code) ops.push({valor: 'omitir', label: 'Quitar de esta droguería', clase: 'btn-suave'});
+  ops.push({valor: 'cancelar', label: 'Cancelar', clase: 'btn-peligro'});
+  ops.push({valor: 'sin', label: 'Sin necesidad', clase: 'btn-suave'});
+  return ops;
+}
+
+async function accionProducto(sku, code, drog) {
+  const r = await elegir('El producto sale de la orden (todas las sucursales de esta tarjeta).',
+    _opcionesQuitar(drog, code), '¿Qué hacés con el producto?');
+  if (!r) return;
+  if (r === 'omitir') return _accionPost('/api/orden/omitir-producto', {sku, drogueria: code});
+  if (r === 'cancelar') return _accionPost('/api/orden/cancelar-producto', {sku});
+  return _accionPost('/api/orden/sin-necesidad', {sku});
+}
+
+async function accionItem(sku, suc, code, drog) {
+  const r = await elegir('Solo afecta a ' + suc + '.',
+    _opcionesQuitar(drog, code), '¿Qué hacés con esta sucursal?');
+  if (!r) return;
+  if (r === 'omitir') return _accionPost('/api/orden/omitir', {sku, sucursal: suc, drogueria: code});
+  if (r === 'cancelar') return _accionPost('/api/orden/cancelar-item', {sku, sucursal: suc});
+  return _accionPost('/api/orden/sin-necesidad', {sku, sucursal: suc});
+}
+
 async function cancelarProducto(sku) {
   const ok = await confirmar('Se cancela para todas las sucursales y queda como cancelado en el pedido.',
     {titulo: '¿Cancelar este producto?', accion: 'Cancelar producto'});

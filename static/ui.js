@@ -93,4 +93,46 @@
       if (btn.dataset.htmlOriginal) btn.innerHTML = btn.dataset.htmlOriginal;
     }
   };
+
+  // Menu de opciones (varios botones). Resuelve con el 'valor' elegido o null.
+  window.elegir = function (mensaje, opciones, titulo) {
+    return new Promise((resolve) => {
+      const viejo = document.getElementById('modal-elegir-app');
+      if (viejo) viejo.remove();
+      const div = document.createElement('div');
+      div.id = 'modal-elegir-app';
+      div.innerHTML =
+        '<div class="modal fade" tabindex="-1">' +
+        '  <div class="modal-dialog modal-dialog-centered">' +
+        '    <div class="modal-content">' +
+        '      <div class="modal-body">' +
+        '        <div class="conf-titulo"></div>' +
+        '        <div class="conf-msg"></div>' +
+        '      </div>' +
+        '      <div class="modal-footer border-0 pt-0 flex-wrap gap-1"></div>' +
+        '    </div>' +
+        '  </div>' +
+        '</div>';
+      document.body.appendChild(div);
+      const modalEl = div.querySelector('.modal');
+      modalEl.querySelector('.conf-titulo').textContent = titulo || 'Elegí una acción';
+      modalEl.querySelector('.conf-msg').textContent = mensaje || '';
+      const footer = modalEl.querySelector('.modal-footer');
+      let elegido = null;
+      const volver = document.createElement('button');
+      volver.type = 'button'; volver.className = 'btn btn-suave btn-sm';
+      volver.textContent = 'Volver'; volver.setAttribute('data-bs-dismiss', 'modal');
+      footer.appendChild(volver);
+      (opciones || []).forEach((o) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn btn-sm ' + (o.clase || 'btn-brand');
+        b.textContent = o.label;
+        b.addEventListener('click', () => { elegido = o.valor; m.hide(); });
+        footer.appendChild(b);
+      });
+      const m = new bootstrap.Modal(modalEl);
+      modalEl.addEventListener('hidden.bs.modal', () => { div.remove(); resolve(elegido); });
+      m.show();
+    });
+  };
 })();
