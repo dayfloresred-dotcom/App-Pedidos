@@ -86,6 +86,8 @@ def init_db():
         conn.execute("ALTER TABLE envios ADD COLUMN fecha TEXT")
     if 'usuario' not in cols_env:
         conn.execute("ALTER TABLE envios ADD COLUMN usuario TEXT")
+    if 'exportado' not in cols_env:
+        conn.execute("ALTER TABLE envios ADD COLUMN exportado INTEGER NOT NULL DEFAULT 0")
     conn.execute('''
         CREATE TABLE IF NOT EXISTS omitidos (
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -501,7 +503,7 @@ def registrar_envio(sucursal, sku, drogueria, cantidad, usuario=None):
         conn.execute('''INSERT INTO envios (sucursal, sku, drogueria, cantidad, fecha, usuario)
             VALUES (?,?,?,?,?,?)
             ON CONFLICT(sucursal, sku, drogueria) DO UPDATE SET
-              cantidad=excluded.cantidad, fecha=excluded.fecha, usuario=excluded.usuario''',
+              cantidad=excluded.cantidad, fecha=excluded.fecha, usuario=excluded.usuario, exportado=0''',
             (sucursal, sku, drogueria, cant, fecha, usuario))
     else:
         conn.execute("DELETE FROM envios WHERE sucursal=? AND sku=? AND drogueria=?", (sucursal, sku, drogueria))
@@ -570,6 +572,20 @@ def get_rotacion_marcada():
     return {(str(r['sucursal']), str(r['sku'])) for r in rows}
 
 
+def marcar_envios_exportados(sucursal, drogueria, skus):
+    """Marca como ya exportados los envíos incluidos en una descarga, para que una segunda
+    descarga no los repita. Si luego se cambia la cantidad (registrar_envio), se resetea a 0."""
+    skus = [x for x in (skus or []) if x]
+    if not skus:
+        return
+    conn = get_db()
+    marcadores = ','.join('?' * len(skus))
+    conn.execute(
+        f"UPDATE envios SET exportado=1 WHERE sucursal=? AND drogueria=? AND sku IN ({marcadores})",
+        [sucursal, drogueria, *skus])
+    conn.commit()
+    conn.close()
+
 def get_envios_sucursal_drogueria(sucursal, drogueria):
     """Unidades enviadas de cada producto a una sucursal desde una droguería (para export por sucursal).
 
@@ -580,6 +596,7 @@ def get_envios_sucursal_drogueria(sucursal, drogueria):
     rows = conn.execute(
         """SELECT e.sku, e.cantidad FROM envios e
            WHERE e.sucursal=? AND e.drogueria=? AND e.cantidad>0
+             AND (e.exportado IS NULL OR e.exportado = 0)
              AND EXISTS (
                SELECT 1 FROM items_solicitud i
                JOIN solicitudes s ON s.id = i.solicitud_id

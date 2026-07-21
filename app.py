@@ -9,7 +9,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal, marcar_sin_necesidad,
                        marcar_comprado_drogueria, marcar_inexistente, cerrar_pedido_forzado,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
-                       get_envios_sucursal_drogueria, omitir_drogueria, omitir_producto, restaurar_item,
+                       get_envios_sucursal_drogueria, marcar_envios_exportados, omitir_drogueria, omitir_producto, restaurar_item,
                        actualizar_comprado_por_envio,
                        carrito_set, carrito_set_obs, get_carrito, carrito_clear, get_ranking)
 from data_loader import buscar_productos, get_laboratorios, load_productos
@@ -764,8 +764,9 @@ def exportar(drogueria):
         return jsonify({'error': 'Elegí una sucursal'}), 400
 
     prod_map = {p['sku']: p for p in load_productos()}
+    filas = get_envios_sucursal_drogueria(sucursal, drog)
     items = []
-    for r in get_envios_sucursal_drogueria(sucursal, drog):
+    for r in filas:
         base = prod_map.get(r['sku'], {})
         items.append({
             'ean':         base.get('ean', ''),
@@ -775,6 +776,7 @@ def exportar(drogueria):
         })
     if not items:
         return jsonify({'error': f'{sucursal} no tiene envíos cargados para {drog}.'}), 400
+    marcar_envios_exportados(sucursal, drog, [r['sku'] for r in filas])
 
     suc_slug = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
     if drog == 'SUIZO':
@@ -801,8 +803,9 @@ def exportar_quantio():
         return jsonify({'error': 'Falta sucursal'}), 400
 
     prod_map = {p['sku']: p for p in load_productos()}
+    filas = get_envios_sucursal_drogueria(sucursal, 'CD')
     items = []
-    for r in get_envios_sucursal_drogueria(sucursal, 'CD'):
+    for r in filas:
         base = prod_map.get(r['sku'], {})
         items.append({
             'ean':     base.get('ean', ''),
@@ -812,6 +815,7 @@ def exportar_quantio():
 
     if not items:
         return jsonify({'error': f'{sucursal} no tiene envíos cargados para CD.'}), 400
+    marcar_envios_exportados(sucursal, 'CD', [r['sku'] for r in filas])
 
     content   = generar_quantio(items)
     suc_slug  = ''.join(c if c.isalnum() else '_' for c in sucursal.lower())
