@@ -23,12 +23,21 @@ from config import PLEX, SUCURSALES, VENTAS_VENTANA_DIAS, FUENTES_RUBROS, fuente
 
 EXCLUIR = {'17', '33'}  # mismo criterio que data_loader
 
+# Vigencia: `medicamentos` arrastra el histórico completo, y los discontinuados
+# entraban al catálogo cuando les quedaba alguna fila de stock (Q_STOCK trae
+# Cantidad IS NOT NULL, no > 0). Se filtra por Activo='S'.
+# NO se filtra por `visible`: pese a lo que sugiere erp_mysql_schema_legacy.md
+# (que cuenta "activos" como Activo='S' AND visible=1), hay productos vigentes
+# con visible=0 — verificado 2026-07-23 sobre los SKU 3002602024 y 3002602032
+# (DOVE HIDRATACION INTENSA, ambos Activo='S' visible=0). Filtrar por visible
+# los borraría del catálogo.
 Q_PRODUCTOS = """
     SELECT m.CodPlex AS sku, m.Producto AS descripcion,
            l.Laborato AS laboratorio, r.Rubro AS rubro, m.Troquel AS troquel
     FROM medicamentos m
     LEFT JOIN laboratorios l ON l.CodLab = m.CodLab
     LEFT JOIN rubros r ON r.CodRubro = m.CodRubro
+    WHERE m.Activo = 'S'
     {filtro_rubros}
 """
 
@@ -153,7 +162,7 @@ def cargar():
     try:
         with conn.cursor() as cur:
             if FUENTES_RUBROS:
-                filtro = 'WHERE r.Rubro IN (' + ','.join(['%s'] * len(FUENTES_RUBROS)) + ')'
+                filtro = 'AND r.Rubro IN (' + ','.join(['%s'] * len(FUENTES_RUBROS)) + ')'
                 cur.execute(Q_PRODUCTOS.format(filtro_rubros=filtro), FUENTES_RUBROS)
             else:
                 cur.execute(Q_PRODUCTOS.format(filtro_rubros=''))

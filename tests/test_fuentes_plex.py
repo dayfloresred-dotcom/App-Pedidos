@@ -1,4 +1,4 @@
-from fuentes_plex import Q_VENTAS, transformar
+from fuentes_plex import Q_PRODUCTOS, Q_VENTAS, transformar
 
 
 def test_transformar_arma_estructura():
@@ -29,6 +29,20 @@ def test_q_ventas_suma_cant_decimal():
     manual 2026-07-06). Sumar Cantidad infla ×UnidadesPorCaja los fraccionados."""
     assert 'fl.CantDecimal' in Q_VENTAS
     assert '-fl.Cantidad ELSE fl.Cantidad' not in Q_VENTAS
+
+
+def test_q_productos_filtra_discontinuados_por_activo():
+    """El catálogo de Plex trae discontinuados; medicamentos.Activo='N' los
+    marca. Sin este filtro entran a la app productos que ya no se reponen
+    (verificado 2026-07-23: 40,7% del catálogo tenía Activo='N')."""
+    assert "m.Activo = 'S'" in Q_PRODUCTOS
+
+
+def test_q_productos_no_filtra_por_visible():
+    """`visible` NO sirve como señal de vigencia: productos vigentes tienen
+    visible=0 (verificado 2026-07-23 contra los SKU 3002602024 y 3002602032,
+    ambos Activo='S' y visible=0). Filtrar por visible=1 los borraría."""
+    assert 'visible' not in Q_PRODUCTOS
 
 
 def test_transformar_ventas_decimales_truncan_a_cajas():
