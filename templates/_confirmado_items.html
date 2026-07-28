@@ -26,7 +26,9 @@
         {% endif %}
       </td>
       <td class="text-center">
-        {% if it.sin_necesidad %}
+        {% if it.drogueria_final == 'INEXISTENTE' %}
+          <span class="badge-cancelado">Producto inexistente</span>
+        {% elif it.sin_necesidad %}
           <span class="badge-cancelado">Sin necesidad</span>
         {% elif it.cancelado or sol.estado == 'cancelado' %}
           <span class="badge-cancelado">✕ Cancelado</span>

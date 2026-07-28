@@ -7,6 +7,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        get_db, actualizar_droguerias_pendientes,
                        get_items_detalle, marcar_item_generado, desmarcar_item_generado, mover_item_sucursal,
                        cancelar_producto, cancelar_producto_sucursal, cancelar_item, get_item_sucursal, marcar_sin_necesidad,
+                       limpiar_sin_existencia_discontinuados,
                        marcar_comprado_drogueria, marcar_inexistente, cerrar_pedido_forzado,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
                        get_envios_sucursal_drogueria, marcar_envios_exportados, omitir_drogueria, omitir_producto, restaurar_item,
@@ -631,6 +632,17 @@ def api_sin_necesidad():
         return jsonify({'error': 'Falta sku'}), 400
     marcar_sin_necesidad(sku, suc)
     return jsonify({'ok': True})
+
+@app.route('/api/orden/limpiar-discontinuados', methods=['POST'])
+@login_required
+@admin_required
+def api_limpiar_discontinuados():
+    """En 'Sin existencia': marca inexistentes los productos que ya no están en el catálogo activo."""
+    prods = load_productos()
+    active_skus = {str(p['sku']) for p in prods}
+    active_eans = {str(p.get('ean', '')).strip() for p in prods if str(p.get('ean', '')).strip()}
+    n = limpiar_sin_existencia_discontinuados(active_skus, active_eans)
+    return jsonify({'ok': True, 'n': n})
 
 @app.route('/api/orden/cancelar-producto', methods=['POST'])
 @login_required

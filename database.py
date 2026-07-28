@@ -474,6 +474,38 @@ def marcar_sin_necesidad(sku, sucursal=None):
     conn.commit()
     conn.close()
 
+def limpiar_sin_existencia_discontinuados(active_skus, active_eans):
+    """Marca como inexistentes los items de 'Sin existencia' (droguería vacía, pendientes)
+    cuyo producto YA NO está en el catálogo activo (ni por sku ni por EAN). Los que siguen
+    activos se mantienen. Devuelve la cantidad de productos marcados."""
+    a_sku = set(str(x) for x in (active_skus or []))
+    a_ean = set(str(x).strip() for x in (active_eans or []) if str(x).strip())
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT DISTINCT i.sku AS sku, i.ean AS ean FROM items_solicitud i "
+        "JOIN solicitudes s ON s.id=i.solicitud_id "
+        "WHERE s.estado='pendiente' AND i.cancelado=0 AND i.comprado=0 AND COALESCE(i.drogueria,'')=''"
+    ).fetchall()
+    to_mark = []
+    for r in rows:
+        sku = str(r['sku']); ean = str(r['ean'] or '').strip()
+        if sku in a_sku or (ean and ean in a_ean):
+            continue  # sigue activo -> se queda
+        to_mark.append(sku)
+    afectadas = set()
+    for sku in to_mark:
+        for x in conn.execute("SELECT DISTINCT s.id AS id FROM solicitudes s "
+                "JOIN items_solicitud i ON i.solicitud_id=s.id "
+                "WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0", (sku,)).fetchall():
+            afectadas.add(x['id'])
+        conn.execute("UPDATE items_solicitud SET cancelado=1, drogueria_final='INEXISTENTE' "
+            "WHERE sku=? AND cancelado=0 AND solicitud_id IN (SELECT id FROM solicitudes WHERE estado='pendiente')", (sku,))
+    for sid in afectadas:
+        _recalc_estado_solicitud(conn, sid)
+    conn.commit()
+    conn.close()
+    return len(to_mark)
+
 def marcar_inexistente(sku):
     """Marca un producto sin precio como inexistente: cancelado + origen 'INEXISTENTE'."""
     conn = get_db()

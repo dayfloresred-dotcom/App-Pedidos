@@ -266,6 +266,16 @@ async function cancelarProducto(sku) {
   else toast(d.error || 'No se pudo cancelar', 'error');
 }
 
+async function limpiarDiscontinuados() {
+  const ok = await confirmar('Marca como inexistentes los productos de esta tarjeta que ya NO están activos en el catálogo (los que siguen activos se mantienen). Se pueden restaurar después.',
+    {titulo: '¿Quitar los discontinuados?', accion: 'Quitar discontinuados'});
+  if (!ok) return;
+  const res = await fetch('/api/orden/limpiar-discontinuados', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) { toast(`${d.n} producto(s) discontinuados marcados como inexistentes`, 'exito'); refrescarOrden(); }
+  else toast(d.error || 'No se pudo', 'error');
+}
+
 async function marcarInexistente() {
   const skus = [];
   document.querySelectorAll('.qty-input[data-drog="SIN_PRECIO"]').forEach(inp => skus.push(inp.dataset.sku));

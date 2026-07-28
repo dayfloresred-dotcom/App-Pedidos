@@ -116,6 +116,10 @@
       </div>
       {% if drog == 'SIN_PRECIO' %}
       <div class="card-footer">
+        <button class="btn btn-sm w-100 btn-suave mb-1"
+          onclick="limpiarDiscontinuados()">
+          🧹 Quitar discontinuados (los que ya no están activos)
+        </button>
         <button class="btn btn-sm w-100 btn-peligro"
           onclick="marcarInexistente()">
           ✕ Marcar como producto inexistente
