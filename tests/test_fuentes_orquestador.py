@@ -68,6 +68,22 @@ def test_refrescar_con_memoria_por_fuente(monkeypatch, tmp_path):
     assert r2['productos'] == 2  # catalogo igual se armo
 
 
+def test_refrescar_avisa_si_plex_vino_del_concentrador(monkeypatch, tmp_path):
+    """Si la carga de Plex salió por el fallback (concentrador), la tarjeta
+    en admin queda 'Con aviso' — mismo patrón que los precios stale."""
+    monkeypatch.setattr(fuentes, '_DIR_MEMORIA', str(tmp_path))
+    monkeypatch.setattr('fuentes_plex.configurada', lambda: True)
+    monkeypatch.setattr('fuentes_plex.cargar', lambda: PLEX)
+    monkeypatch.setattr('fuentes_plex.origen_conexion', lambda: 'concentrador')
+    monkeypatch.setattr('fuentes_comparador.configurada', lambda: True)
+    monkeypatch.setattr('fuentes_comparador.cargar', lambda: PRECIOS)
+    monkeypatch.setattr('fuentes_quantio.configurada', lambda: False)
+
+    r = fuentes.refrescar_fuentes()
+    assert r['ok'] is True and r['productos'] == 2  # el catalogo se armo igual
+    assert 'concentrador' in (r['fuentes']['plex']['error'] or '')
+
+
 def test_refrescar_falla_si_fuente_critica_sin_memoria(monkeypatch, tmp_path):
     monkeypatch.setattr(fuentes, '_DIR_MEMORIA', str(tmp_path))
     monkeypatch.setattr('fuentes_plex.configurada', lambda: True)

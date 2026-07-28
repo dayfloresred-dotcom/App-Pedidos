@@ -104,6 +104,12 @@ def refrescar_fuentes():
     info['filas'] = len(plex['productos']) if plex else 0
     resumen['fuentes']['plex'] = info
     set_fuente_estado('plex', info['ok'], info['filas'], info['error'])
+    if info['ok'] and fuentes_plex.origen_conexion() == 'concentrador':
+        # la carga salio por el fallback: refleja "Con aviso" en la tarjeta
+        # (mismo patron que los precios stale; ultima_ok ya quedo actualizada)
+        aviso = 'réplica caída — datos desde el concentrador (fallback)'
+        info['error'] = aviso
+        set_fuente_estado('plex', False, info['filas'], aviso)
 
     precios, info_p = _cargar_con_memoria('comparador', fuentes_comparador.cargar) \
         if fuentes_comparador.configurada() else (None, {'ok': False, 'error': 'sin configurar', 'desde_memoria': False})

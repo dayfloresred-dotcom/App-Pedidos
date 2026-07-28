@@ -1,4 +1,11 @@
+import pytest
+
+import fuentes_plex
 from fuentes_plex import Q_PRODUCTOS, Q_VENTAS, transformar
+
+CFG_REPLICA = {'host': 'replica', 'port': 3306, 'user': 'u', 'password': 'p', 'db': 'd'}
+CFG_CONCENTRADOR = {'host': 'concentrador', 'port': 3306, 'user': 'u', 'password': 'p', 'db': 'd'}
+CFG_VACIA = {'host': '', 'port': 3306, 'user': '', 'password': '', 'db': ''}
 
 
 def test_transformar_arma_estructura():
@@ -57,3 +64,51 @@ def test_ventas_negativas_no_rompen():
     rows_prod = [{'sku': 1, 'descripcion': 'P', 'laboratorio': 'L', 'rubro': 'Perfumería', 'troquel': None}]
     r = transformar(rows_prod, [], [{'sku': 1, 'sucursal': 2, 'unidades': -3}], [])
     assert r['ventas']['1'] == {'CERRO': -3}
+
+
+def test_conn_usa_replica_si_anda(monkeypatch):
+    """Con la réplica sana no se toca el concentrador."""
+    intentos = []
+
+    def fake_connect(cfg):
+        intentos.append(cfg['host'])
+        return 'CONN-REPLICA'
+
+    monkeypatch.setattr(fuentes_plex, '_connect', fake_connect)
+    monkeypatch.setattr(fuentes_plex, 'PLEX', CFG_REPLICA)
+    monkeypatch.setattr(fuentes_plex, 'PLEX_FALLBACK', CFG_CONCENTRADOR)
+    assert fuentes_plex._conn() == 'CONN-REPLICA'
+    assert intentos == ['replica']
+    assert fuentes_plex.origen_conexion() == 'replica'
+
+
+def test_conn_cae_al_concentrador_si_replica_falla(monkeypatch):
+    """Si el connect a la réplica falla y el concentrador (PLEX_FB_*) está
+    configurado, conecta ahí y registra el origen para el aviso en admin."""
+    intentos = []
+
+    def fake_connect(cfg):
+        intentos.append(cfg['host'])
+        if cfg['host'] == 'replica':
+            raise OSError('replica caida')
+        return 'CONN-CONCENTRADOR'
+
+    monkeypatch.setattr(fuentes_plex, '_connect', fake_connect)
+    monkeypatch.setattr(fuentes_plex, 'PLEX', CFG_REPLICA)
+    monkeypatch.setattr(fuentes_plex, 'PLEX_FALLBACK', CFG_CONCENTRADOR)
+    assert fuentes_plex._conn() == 'CONN-CONCENTRADOR'
+    assert intentos == ['replica', 'concentrador']
+    assert fuentes_plex.origen_conexion() == 'concentrador'
+
+
+def test_conn_sin_concentrador_configurado_propaga(monkeypatch):
+    """Sin PLEX_FB_* configurado se propaga el error original (comportamiento
+    actual: _cargar_con_memoria usa el last-good)."""
+    def fake_connect(cfg):
+        raise OSError('replica caida')
+
+    monkeypatch.setattr(fuentes_plex, '_connect', fake_connect)
+    monkeypatch.setattr(fuentes_plex, 'PLEX', CFG_REPLICA)
+    monkeypatch.setattr(fuentes_plex, 'PLEX_FALLBACK', CFG_VACIA)
+    with pytest.raises(OSError, match='replica caida'):
+        fuentes_plex._conn()

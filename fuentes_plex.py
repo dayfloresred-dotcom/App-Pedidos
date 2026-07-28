@@ -19,7 +19,8 @@ Deltas de nombres validados contra erp_mysql_schema_legacy.md y etl/etl.py
 """
 from datetime import date, timedelta
 
-from config import PLEX, SUCURSALES, VENTAS_VENTANA_DIAS, FUENTES_RUBROS, fuente_mysql_configurada
+from config import (PLEX, PLEX_FALLBACK, SUCURSALES, VENTAS_VENTANA_DIAS,
+                    FUENTES_RUBROS, fuente_mysql_configurada)
 
 EXCLUIR = {'17', '33'}  # mismo criterio que data_loader
 
@@ -78,14 +79,40 @@ def configurada():
     return fuente_mysql_configurada(PLEX)
 
 
-def _conn():
+def _connect(cfg):
     import pymysql
     return pymysql.connect(
-        host=PLEX['host'], port=PLEX['port'], user=PLEX['user'],
-        password=PLEX['password'], database=PLEX['db'],
+        host=cfg['host'], port=cfg['port'], user=cfg['user'],
+        password=cfg['password'], database=cfg['db'],
         connect_timeout=10, read_timeout=110,
         charset='utf8',  # el MySQL de Plex no conoce utf8mb4 (mismo charset que el ETL)
         cursorclass=pymysql.cursors.DictCursor)
+
+
+_origen = 'replica'  # de la última conexión lograda: 'replica' | 'concentrador'
+
+
+def _conn():
+    """Conecta a la réplica (PLEX_*); si el connect falla y el concentrador
+    (PLEX_FB_*, la base original, usuario read-only) está configurado, cae
+    ahí. La réplica sigue siendo la conexión primaria: el concentrador se
+    intenta solo ante fallo, en cada conexión."""
+    global _origen
+    try:
+        conn = _connect(PLEX)
+        _origen = 'replica'
+        return conn
+    except Exception:
+        if not fuente_mysql_configurada(PLEX_FALLBACK):
+            raise
+        conn = _connect(PLEX_FALLBACK)
+        _origen = 'concentrador'
+        return conn
+
+
+def origen_conexion():
+    """'replica' o 'concentrador', según dónde se logró la última conexión."""
+    return _origen
 
 
 def _nombre_sucursal(sucursal):

@@ -83,6 +83,9 @@ def _mysql_cfg(prefijo):
     }
 
 PLEX     = _mysql_cfg('PLEX')
+# Concentrador (la base original de Plex): fallback read-only para cuando la
+# réplica (PLEX_*) no responde. Sin PLEX_FB_* configurado no cambia nada.
+PLEX_FALLBACK = _mysql_cfg('PLEX_FB')
 CD_MYSQL = _mysql_cfg('CD')
 
 def fuente_mysql_configurada(cfg):
