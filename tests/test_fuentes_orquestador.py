@@ -119,3 +119,40 @@ def test_relevancia_excluye_sin_senal_y_fallback_ean():
     p3 = next(p for p in cat if p['sku'] == '3')
     assert p3['drogueria'] == 'SUD' and p3['mejor_precio'] == 12.0  # matcheo por EAN
     assert p3['troquel'] == '9998887'  # alfabeta por EAN
+
+
+def test_relevancia_excluye_filas_en_cero():
+    """Plex deja filas de stock en 0 (y Q_STOCK las trae: Cantidad IS NOT NULL).
+    Un dict {'CERRO': 0} es truthy, asi que productos muertos entraban igual:
+    9475 de 30692 al detectarlo (2026-07-29). Se exige un valor != 0."""
+    plex = {
+        'productos': {
+            '1': {'descripcion': 'STOCK REAL', 'laboratorio': 'L', 'rubro': 'Perfumería',
+                  'ean': '', 'troquel': ''},
+            '2': {'descripcion': 'ZOMBIE STOCK 0', 'laboratorio': 'L', 'rubro': 'Perfumería',
+                  'ean': '', 'troquel': ''},
+            '3': {'descripcion': 'ZOMBIE VENTAS 0', 'laboratorio': 'L', 'rubro': 'Perfumería',
+                  'ean': '', 'troquel': ''},
+            '4': {'descripcion': 'SOLO DEVOLUCION', 'laboratorio': 'L', 'rubro': 'Perfumería',
+                  'ean': '', 'troquel': ''},
+        },
+        'ventas': {'3': {'CERRO': 0, 'RECTA': 0}, '4': {'CERRO': -2}},
+        'stock':  {'1': {'CERRO': 3}, '2': {'CERRO': 0, 'RECTA': 0, 'URCA': 0}},
+    }
+    precios = {'precios': {}, 'precios_ean': {}, 'alfabeta': {}, 'alfabeta_ean': {},
+               'mas_reciente': None, 'stale': False}
+    cat = fuentes.construir_catalogo(plex, precios, {})
+    # el 4 se queda: una NC es movimiento real del producto
+    assert {p['sku'] for p in cat} == {'1', '4'}
+
+
+def test_relevancia_conserva_stock_cd_aunque_sucursales_en_cero():
+    """Stock en el CD es señal por si solo, aunque las sucursales esten en 0."""
+    plex = {
+        'productos': {'9': {'descripcion': 'EN CD', 'laboratorio': 'L', 'rubro': 'Perfumería',
+                            'ean': '', 'troquel': ''}},
+        'ventas': {}, 'stock': {'9': {'CERRO': 0}},
+    }
+    precios = {'precios': {}, 'precios_ean': {}, 'alfabeta': {}, 'alfabeta_ean': {},
+               'mas_reciente': None, 'stale': False}
+    assert [p['sku'] for p in fuentes.construir_catalogo(plex, precios, {'9': 7})] == ['9']

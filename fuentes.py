@@ -58,9 +58,14 @@ def construir_catalogo(plex, precios, stock_cd):
         cant_cd = int(stock_cd.get(sku, 0))
         ventas = plex['ventas'].get(sku, {})
         stock = plex['stock'].get(sku, {})
-        if not (ventas or stock or cant_cd > 0):
+        if not (any(ventas.values()) or any(stock.values()) or cant_cd > 0):
             # Sin movimiento en la cadena: fuera del catálogo. (Tener precio
             # en el comparador NO alcanza — incluiría medio catálogo nacional.)
+            # Se exige un valor != 0, no la mera existencia de la fila: Plex
+            # conserva filas de stock en 0 de productos muertos y Q_STOCK las
+            # trae (Cantidad IS NOT NULL), asi que un dict {'CERRO': 0} —que es
+            # truthy— colaba discontinuados que Activo='S' no filtra (registros
+            # duplicados del mismo EAN que quedaron activos en el ERP).
             continue
         drogueria, mejor_precio, drog_ext, _ = decidir_drogueria(
             cant_cd, pr.get('SUD'), pr.get('SUIZO'))
