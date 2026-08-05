@@ -357,6 +357,18 @@ def cancelar_item(item_id):
     conn.close()
     return row['solicitud_id']
 
+def get_item_sku(item_id):
+    conn = get_db()
+    row = conn.execute("SELECT sku FROM items_solicitud WHERE id=?", (item_id,)).fetchone()
+    conn.close()
+    return row['sku'] if row else None
+
+def set_item_drogueria(item_id, drogueria):
+    conn = get_db()
+    conn.execute("UPDATE items_solicitud SET drogueria=? WHERE id=?", (drogueria or '', item_id))
+    conn.commit()
+    conn.close()
+
 def restaurar_item(item_id):
     """Descancela un ítem: vuelve a pendiente y reaparece en Generar orden."""
     conn = get_db()

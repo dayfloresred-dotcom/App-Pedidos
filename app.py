@@ -10,7 +10,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        limpiar_sin_existencia_discontinuados,
                        marcar_comprado_drogueria, marcar_inexistente, cerrar_pedido_forzado,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
-                       get_envios_sucursal_drogueria, marcar_envios_exportados, omitir_drogueria, omitir_producto, restaurar_item,
+                       get_envios_sucursal_drogueria, marcar_envios_exportados, omitir_drogueria, omitir_producto, restaurar_item, get_item_sku, set_item_drogueria,
                        actualizar_comprado_por_envio,
                        carrito_set, carrito_set_obs, get_carrito, carrito_clear, get_ranking)
 from data_loader import buscar_productos, get_laboratorios, load_productos
@@ -753,6 +753,12 @@ def api_restaurar_item():
     if session.get('rol') != 'admin' and session.get('username') != suc:
         return jsonify({'error': 'Sin permiso'}), 403
     restaurar_item(item_id)
+    # Recalcular la droguería del item restaurado segun el stock/precio ACTUAL,
+    # para que caiga en la tarjeta que corresponda (CD si hay stock, o la mejor droguería).
+    sku = get_item_sku(item_id)
+    if sku:
+        prod = {pr['sku']: pr for pr in load_productos()}.get(sku)
+        set_item_drogueria(item_id, (prod or {}).get('drogueria', ''))
     return jsonify({'ok': True})
 
 # ── Export routes ──────────────────────────────────────────────────────────
