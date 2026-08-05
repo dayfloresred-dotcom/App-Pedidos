@@ -14,7 +14,12 @@
       <option value="">Todos</option>
       {% for l in labs_orden %}<option value="{{ l }}" {% if filtro_lab==l %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select>
-    {% if filtro_suc or filtro_lab %}<a href="{{ url_for('generar_orden', suc='', lab='') }}" class="btn btn-sm btn-outline-secondary">✕ Limpiar</a>{% endif %}
+    <span class="small text-muted">Pedido:</span>
+    <select name="ped" multiple size="3" class="form-select form-select-sm" style="width:auto;min-width:180px" title="Elegí uno o varios pedidos pendientes (Ctrl/Cmd para varios)">
+      {% for pe in pedidos_pendientes %}<option value="{{ pe.id }}" {% if pe.id|string in filtro_ped %}selected{% endif %}>{{ pe.numero }} · {{ pe.sucursal }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-brand">Filtrar</button>
+    {% if filtro_suc or filtro_lab or filtro_ped %}<a href="{{ url_for('generar_orden', suc='', lab='') }}" class="btn btn-sm btn-outline-secondary">✕ Limpiar</a>{% endif %}
   </form>
   <input id="buscar-orden" type="text" class="form-control form-control-sm" style="width:230px"
     placeholder="Buscar por nombre o EAN" oninput="aplicarFiltrosOrden()">
@@ -76,7 +81,10 @@ async function refrescarOrden() {
   const scrolls = [...grid.querySelectorAll('.card-scroll')].map(b => b.scrollTop);
   const scrollY = window.scrollY;
 
-  const res = await fetch('/generar-orden/fragmento?suc=' + encodeURIComponent(filtroActual()));
+  const qs = new URLSearchParams();
+  qs.set('suc', filtroActual());
+  new URLSearchParams(location.search).getAll('ped').forEach(pp => qs.append('ped', pp));
+  const res = await fetch('/generar-orden/fragmento?' + qs.toString());
   if (!res.ok) { toast('No se pudo refrescar la orden', 'error'); return; }
   grid.innerHTML = await res.text();
 

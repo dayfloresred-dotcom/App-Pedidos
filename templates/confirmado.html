@@ -55,6 +55,7 @@
         </form>
         {% if session.get('rol') == 'admin' %}
         <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="cerrarForzado()">✓ Forzar cierre del pedido</button>
+        <a href="{{ url_for('generar_orden', ped=sol.id) }}" class="btn btn-sm btn-outline-primary ms-1">Ver en Generar orden</a>
         {% endif %}
         {% endif %}
       </div>

@@ -206,7 +206,7 @@ def get_todas_solicitudes(sucursal_filtro=None, lab_filtro=None, drogueria_filtr
     conn.close()
     return [dict(r) for r in rows]
 
-def get_consolidado(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None):
+def get_consolidado(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None, solicitud_ids=None):
     conn = get_db()
     query = '''
         SELECT i.sku, i.ean, i.descripcion, i.laboratorio, i.drogueria,
@@ -223,6 +223,9 @@ def get_consolidado(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None
         query += ' AND LOWER(i.laboratorio) LIKE ?'; params.append(f'%{lab_filtro.lower()}%')
     if drogueria_filtro:
         query += ' AND i.drogueria=?'; params.append(drogueria_filtro)
+    if solicitud_ids:
+        marc = ','.join('?' * len(solicitud_ids))
+        query += f' AND i.solicitud_id IN ({marc})'; params += [int(x) for x in solicitud_ids]
     query += ' GROUP BY i.sku ORDER BY total DESC'
     rows = conn.execute(query, params).fetchall()
     conn.close()
@@ -240,22 +243,28 @@ def get_detalle_por_sucursal(sku):
     conn.close()
     return [dict(r) for r in rows]
 
-def get_items_detalle(sku):
+def get_items_detalle(sku, solicitud_ids=None):
     """Detalle por sucursal de un producto pendiente, con estado de orden.
     ordenado=1 solo si TODOS los ítems de esa sucursal+sku están generados."""
     conn = get_db()
-    rows = conn.execute('''
-        SELECT s.sucursal, i.drogueria AS drogueria,
-               SUM(i.cantidad)        as cantidad,
-               MIN(i.ordenado)        as ordenado,
-               MAX(i.drogueria_final) as drogueria_final,
-               MAX(i.observacion)     as observacion
-        FROM items_solicitud i
-        JOIN solicitudes s ON s.id = i.solicitud_id
-        WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0 AND i.comprado=0
-        GROUP BY s.sucursal, i.drogueria
-        ORDER BY s.sucursal
-    ''', (sku,)).fetchall()
+    q = ("SELECT s.sucursal, i.drogueria AS drogueria, SUM(i.cantidad) as cantidad, "
+         "MIN(i.ordenado) as ordenado, MAX(i.drogueria_final) as drogueria_final, "
+         "MAX(i.observacion) as observacion FROM items_solicitud i "
+         "JOIN solicitudes s ON s.id = i.solicitud_id "
+         "WHERE i.sku=? AND s.estado='pendiente' AND i.cancelado=0 AND i.comprado=0")
+    params = [sku]
+    if solicitud_ids:
+        marc = ','.join('?' * len(solicitud_ids))
+        q += f" AND i.solicitud_id IN ({marc})"; params += [int(x) for x in solicitud_ids]
+    q += " GROUP BY s.sucursal, i.drogueria ORDER BY s.sucursal"
+    rows = conn.execute(q, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_pedidos_pendientes():
+    """Lista de pedidos pendientes (id, numero, sucursal) para el filtro de Generar orden."""
+    conn = get_db()
+    rows = conn.execute("SELECT id, numero, sucursal FROM solicitudes WHERE estado='pendiente' ORDER BY numero").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 

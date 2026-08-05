@@ -10,7 +10,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        limpiar_sin_existencia_discontinuados,
                        marcar_comprado_drogueria, marcar_inexistente, cerrar_pedido_forzado,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
-                       get_envios_sucursal_drogueria, marcar_envios_exportados, omitir_drogueria, omitir_producto, restaurar_item, get_item_sku, set_item_drogueria,
+                       get_envios_sucursal_drogueria, marcar_envios_exportados, omitir_drogueria, omitir_producto, restaurar_item, get_item_sku, set_item_drogueria, get_pedidos_pendientes,
                        actualizar_comprado_por_envio,
                        carrito_set, carrito_set_obs, get_carrito, carrito_clear, get_ranking)
 from data_loader import buscar_productos, get_laboratorios, load_productos
@@ -274,10 +274,10 @@ def ranking_export():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
-def _armar_orden(filtro_suc):
+def _armar_orden(filtro_suc, solicitud_ids=None):
     """Arma la orden agrupada por droguería. Única fuente de verdad para
     la página completa y el fragmento (refresco sin reload)."""
-    prods    = get_consolidado(sucursal_filtro=filtro_suc or None)
+    prods    = get_consolidado(sucursal_filtro=filtro_suc or None, solicitud_ids=solicitud_ids)
     prod_map = {p['sku']: p for p in load_productos()}
     orden    = {'DROGUERIA RED': [], 'SUD': [], 'SUIZO': [], 'SIN_PRECIO': []}
 
@@ -315,7 +315,7 @@ def _armar_orden(filtro_suc):
         raw_cd   = base.get('stock_cd', 0)
         stock_cd = raw_cd if isinstance(raw_cd, int) else (1 if raw_cd == 'SI' else 0)
         drog_ext = base.get('drog_ext', '')
-        detalle = get_items_detalle(sku)
+        detalle = get_items_detalle(sku, solicitud_ids=solicitud_ids)
         if filtro_suc:
             detalle = [d for d in detalle if d['sucursal'] == filtro_suc]
         for d in detalle:
@@ -380,17 +380,21 @@ def generar_orden():
     # Recuerda los filtros (sucursal + laboratorio) en la sesion: si vienen en la
     # URL los guarda; si no (p.ej. al volver por el menu) los restaura via redirect
     # para que la URL quede consistente con lo que se ve.
+    ped_ids = [x for x in request.args.getlist('ped') if x.strip()]
     if 'suc' in request.args or 'lab' in request.args:
         filtro_suc = request.args.get('suc', '')
         filtro_lab = request.args.get('lab', '')
         session['gen_orden_suc'] = filtro_suc
         session['gen_orden_lab'] = filtro_lab
+    elif ped_ids:
+        filtro_suc = ''
+        filtro_lab = ''
     else:
         filtro_suc = session.get('gen_orden_suc', '')
         filtro_lab = session.get('gen_orden_lab', '')
         if filtro_suc or filtro_lab:
             return redirect(url_for('generar_orden', suc=filtro_suc, lab=filtro_lab))
-    orden, sucs_orden = _armar_orden(filtro_suc)
+    orden, sucs_orden = _armar_orden(filtro_suc, solicitud_ids=ped_ids or None)
     labs_set = {(it.get('laboratorio') or '').strip()
                 for its in orden.values() for it in its
                 if (it.get('laboratorio') or '').strip()}
@@ -402,6 +406,8 @@ def generar_orden():
         sucs_orden=sucs_orden,
         labs_orden=labs_orden,
         sucursales=SUCURSAL_NAMES,
+        pedidos_pendientes=get_pedidos_pendientes(),
+        filtro_ped=ped_ids,
         filtro_suc=filtro_suc,
         filtro_lab=filtro_lab,
         hoy=now_local().strftime('%d/%m/%Y'))
@@ -413,7 +419,8 @@ def generar_orden():
 def generar_orden_fragmento():
     """Solo la grilla de tarjetas, para refrescar sin recargar la página."""
     filtro_suc = request.args.get('suc', '')
-    orden, _ = _armar_orden(filtro_suc)
+    ped_ids = [x for x in request.args.getlist('ped') if x.strip()]
+    orden, _ = _armar_orden(filtro_suc, solicitud_ids=ped_ids or None)
     return render_template('_orden_grid.html', orden=orden)
 
 # ── API endpoints ──────────────────────────────────────────────────────────
