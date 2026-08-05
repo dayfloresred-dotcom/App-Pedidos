@@ -92,15 +92,19 @@ async function restaurarItem(itemId) {
 }
 
 async function cerrarForzado() {
-  const ok = await confirmar('Las unidades que no se enviaron quedarán como \'Pedido realizado\' y el pedido dejará de figurar como pendiente.',
-    {titulo: '¿Forzar el cierre del pedido?', accion: 'Forzar cierre', peligro: false});
-  if (!ok) return;
+  const r = await elegir('¿Qué hacemos con los productos que quedaron pendientes?',
+    [{valor: 'mover', label: 'Volver a Generar orden (pedido nuevo)', clase: 'btn-brand'},
+     {valor: 'no_enviado', label: 'Dejarlos como \'No enviado\'', clase: 'btn-suave'}],
+    '¿Forzar el cierre del pedido?');
+  if (!r) return;
   const res = await fetch(location.pathname.replace('/confirmado/', '/solicitud/') + '/cerrar-forzado', {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({modo: r})
   });
   const d = await res.json().catch(() => ({}));
-  if (res.ok && d.ok) { toast('Pedido cerrado', 'exito'); setTimeout(() => location.reload(), 600); }
-  else toast(d.error || 'No se pudo cerrar el pedido', 'error');
+  if (res.ok && d.ok) {
+    toast(r === 'mover' && d.nuevo_numero ? `Pendientes movidos a ${d.nuevo_numero}` : 'Pedido cerrado', 'exito');
+    setTimeout(() => location.reload(), 800);
+  } else toast(d.error || 'No se pudo cerrar el pedido', 'error');
 }
 
 async function refrescarItems() {

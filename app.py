@@ -169,8 +169,10 @@ def cerrar_forzado(sol_id):
         return jsonify({'error': 'Pedido no encontrado'}), 404
     if sol['estado'] != 'pendiente':
         return jsonify({'error': 'El pedido ya no esta pendiente'}), 400
-    n = cerrar_pedido_forzado(sol_id)
-    return jsonify({'ok': True, 'n': n})
+    modo = (request.get_json(silent=True) or {}).get('modo', 'no_enviado')
+    if modo not in ('mover', 'no_enviado'):
+        modo = 'no_enviado'
+    return jsonify(cerrar_pedido_forzado(sol_id, modo))
 
 @app.route('/solicitud/<int:sol_id>/exportar/<drogueria>')
 @login_required

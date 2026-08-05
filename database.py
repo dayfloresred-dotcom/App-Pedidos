@@ -376,7 +376,7 @@ def restaurar_item(item_id):
     if not row:
         conn.close()
         return None
-    conn.execute("UPDATE items_solicitud SET cancelado=0, sin_necesidad=0 WHERE id=?", (item_id,))
+    conn.execute("UPDATE items_solicitud SET cancelado=0, sin_necesidad=0, ordenado=0, fecha_orden=NULL, drogueria_final=NULL WHERE id=?", (item_id,))
     # Reabrir el pedido si estaba cerrado (cancelado O comprado) y recalcular su estado real.
     # Antes solo contemplaba 'cancelado': un item restaurado en un pedido auto-cerrado como
     # 'comprado' quedaba pendiente pero el pedido seguia cerrado, y no aparecia en Generar orden.
@@ -451,22 +451,41 @@ def marcar_comprado_drogueria(drogueria, fecha):
     conn.close()
     return n
 
-def cerrar_pedido_forzado(sol_id):
-    """Cierra un pedido a la fuerza: los items que aun no estaban comprados quedan
-    marcados como comprados ('Pedido realizado'), aunque no se hayan enviado todas las
-    unidades pedidas. Recalcula el estado de la solicitud (pasa a 'comprado').
-    Devuelve la cantidad de items afectados."""
+def cerrar_pedido_forzado(sol_id, modo='no_enviado'):
+    """Cierra un pedido que tiene items pendientes.
+    modo='mover': mueve los pendientes a un pedido NUEVO (mismo numero + letra A, B, ...)
+        que sigue apareciendo en Generar orden. El original queda cerrado con lo resuelto.
+    modo='no_enviado': marca los pendientes como 'No enviado' (salen de Generar orden).
+    Devuelve dict {ok, n, nuevo_numero}."""
+    import re
     conn = get_db()
-    fecha = now_local().strftime('%d/%m/%Y')
-    cur = conn.execute(
-        "UPDATE items_solicitud SET comprado=1, fecha_orden=COALESCE(fecha_orden, ?) "
-        "WHERE solicitud_id=? AND cancelado=0 AND comprado=0",
-        (fecha, sol_id))
-    n = cur.rowcount
+    sol = conn.execute("SELECT * FROM solicitudes WHERE id=?", (sol_id,)).fetchone()
+    if not sol:
+        conn.close(); return {'ok': False, 'error': 'Pedido no encontrado'}
+    pend = [r['id'] for r in conn.execute(
+        "SELECT id FROM items_solicitud WHERE solicitud_id=? AND cancelado=0 AND comprado=0", (sol_id,)).fetchall()]
+    nuevo_numero = None
+    if modo == 'mover' and pend:
+        base = re.sub(r'-[A-Z]$', '', sol['numero'])
+        for L in [chr(x) for x in range(65, 91)]:
+            cand = f'{base}-{L}'
+            if not conn.execute("SELECT 1 FROM solicitudes WHERE numero=?", (cand,)).fetchone():
+                nuevo_numero = cand; break
+        if nuevo_numero is None:
+            nuevo_numero = f'{base}-{sol_id}'
+        fecha = now_local().strftime('%d/%m/%Y %H:%M')
+        conn.execute("INSERT INTO solicitudes (numero, sucursal, creado_por, fecha_solicitud, estado) "
+                     "VALUES (?,?,?,?, 'pendiente')", (nuevo_numero, sol['sucursal'], sol['creado_por'], fecha))
+        new_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        marc = ','.join('?' * len(pend))
+        conn.execute(f"UPDATE items_solicitud SET solicitud_id=? WHERE id IN ({marc})", [new_id, *pend])
+    elif pend:
+        marc = ','.join('?' * len(pend))
+        conn.execute(f"UPDATE items_solicitud SET cancelado=1, drogueria_final='NO_ENVIADO' WHERE id IN ({marc})", pend)
     _recalc_estado_solicitud(conn, sol_id)
     conn.commit()
     conn.close()
-    return n
+    return {'ok': True, 'n': len(pend), 'nuevo_numero': nuevo_numero}
 
 
 def marcar_sin_necesidad(sku, sucursal=None):
