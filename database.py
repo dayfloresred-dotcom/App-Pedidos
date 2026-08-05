@@ -365,7 +365,11 @@ def restaurar_item(item_id):
         conn.close()
         return None
     conn.execute("UPDATE items_solicitud SET cancelado=0, sin_necesidad=0 WHERE id=?", (item_id,))
-    conn.execute("UPDATE solicitudes SET estado='pendiente', fecha_compra=NULL WHERE id=? AND estado='cancelado'", (row['solicitud_id'],))
+    # Reabrir el pedido si estaba cerrado (cancelado O comprado) y recalcular su estado real.
+    # Antes solo contemplaba 'cancelado': un item restaurado en un pedido auto-cerrado como
+    # 'comprado' quedaba pendiente pero el pedido seguia cerrado, y no aparecia en Generar orden.
+    conn.execute("UPDATE solicitudes SET estado='pendiente', fecha_compra=NULL WHERE id=? AND estado IN ('cancelado','comprado')", (row['solicitud_id'],))
+    _recalc_estado_solicitud(conn, row['solicitud_id'])
     conn.commit()
     conn.close()
     return row['solicitud_id']
