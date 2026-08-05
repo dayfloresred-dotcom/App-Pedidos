@@ -11,11 +11,11 @@
         <span class="small text-muted">{{ items|length }} productos · {{ items|sum(attribute='total') }} u.</span>
       </div>
       <div class="card-body p-0 card-scroll">
-        {% set ncols = 7 if drog == 'DROGUERIA RED' else 5 %}
+        {% set ncols = 7 if drog == 'DROGUERIA RED' else 6 %}
         <table class="table table-sm mb-0">
           <thead><tr>
             <th>EAN</th><th>Producto</th><th>Sucursales</th>
-            {% if drog == 'DROGUERIA RED' %}<th class="text-center">Stock CD</th><th class="text-center">Alt. droguería</th>{% endif %}
+            {% if drog == 'DROGUERIA RED' %}<th class="text-center">Stock CD</th><th class="text-center">Alt. droguería</th>{% else %}<th class="text-center">Stock CD</th>{% endif %}
             <th class="text-center" style="width:78px">Solicitado</th><th style="width:34px"></th>
           </tr></thead>
           <tbody>
@@ -43,6 +43,8 @@
                   <span class="text-muted small">&mdash;</span>
                 {% endif %}
               </td>
+              {% else %}
+              <td class="text-center {% if it.stock_cd %}fw-bold text-success{% else %}text-muted small{% endif %}">{{ it.stock_cd if it.stock_cd else '—' }}</td>
               {% endif %}
               <td class="text-center">
                 <input type="number" min="1" value="{{ it.total }}"
@@ -95,13 +97,14 @@
                       <button class="btn btn-sm btn-link text-danger p-0" title="Quitar / cancelar / sin necesidad"
                         onclick="accionItem('{{ it.sku }}','{{ d.sucursal }}','','SIN_PRECIO')">&times;</button>
                       {% endif %}
+                      {% set rec = 'CD' if (it.stock_cd and it.stock_cd >= d.cantidad) else it.drog_ext %}
                       <select class="form-select form-select-sm d-inline-block" style="width:auto"
-                        title="Mover esta sucursal a otra droguería"
+                        title="Mover esta sucursal a otra droguería (⭐ = mejor opción)"
                         onchange="moverItem('{{ it.sku }}','{{ d.sucursal }}', this.value)">
                         <option value="">Mover a…</option>
-                        {% if drog != 'DROGUERIA RED' %}<option value="CD">Droguería Red</option>{% endif %}
-                        {% if drog != 'SUD' %}<option value="SUD">SUD</option>{% endif %}
-                        {% if drog != 'SUIZO' %}<option value="SUIZO">Suizo</option>{% endif %}
+                        {% if drog != 'DROGUERIA RED' %}<option value="CD">{% if rec == 'CD' %}⭐ {% endif %}Droguería Red</option>{% endif %}
+                        {% if drog != 'SUD' %}<option value="SUD">{% if rec == 'SUD' %}⭐ {% endif %}SUD</option>{% endif %}
+                        {% if drog != 'SUIZO' %}<option value="SUIZO">{% if rec == 'SUIZO' %}⭐ {% endif %}Suizo</option>{% endif %}
                       </select>
                     </div>
                     {% endfor %}

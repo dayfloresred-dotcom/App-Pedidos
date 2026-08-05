@@ -229,7 +229,6 @@ async function _accionPost(url, body) {
 
 function _opcionesQuitar(drog, code) {
   const ops = [];
-  if (drog !== 'SIN_PRECIO' && code) ops.push({valor: 'omitir', label: 'Quitar de esta droguería', clase: 'btn-suave'});
   ops.push({valor: 'cancelar', label: 'Cancelar', clase: 'btn-peligro'});
   ops.push({valor: 'sin', label: 'Sin necesidad', clase: 'btn-suave'});
   return ops;

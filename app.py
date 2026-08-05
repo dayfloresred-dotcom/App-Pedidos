@@ -279,12 +279,6 @@ def _armar_orden(filtro_suc):
     prod_map = {p['sku']: p for p in load_productos()}
     orden    = {'DROGUERIA RED': [], 'SUD': [], 'SUIZO': [], 'SIN_PRECIO': []}
 
-    conn = get_db()
-    omit_map = {}
-    for r in conn.execute("SELECT sucursal, sku, drogueria FROM omitidos").fetchall():
-        omit_map.setdefault((r['sucursal'], r['sku']), set()).add(r['drogueria'])
-    conn.close()
-
     def visibles(detalle, sku, code):
         out = []
         for d in detalle:
@@ -292,8 +286,6 @@ def _armar_orden(filtro_suc):
             if env.get(code):
                 continue
             if env.get('ROT'):
-                continue
-            if code in omit_map.get((d['sucursal'], sku), set()):
                 continue
             out.append(d)
         return out
