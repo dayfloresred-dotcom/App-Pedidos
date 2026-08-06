@@ -380,7 +380,9 @@ def generar_orden():
     # Recuerda los filtros (sucursal + laboratorio) en la sesion: si vienen en la
     # URL los guarda; si no (p.ej. al volver por el menu) los restaura via redirect
     # para que la URL quede consistente con lo que se ve.
-    ped_ids = [x for x in request.args.getlist('ped') if x.strip()]
+    # solo numericos: get_consolidado/get_items_detalle hacen int() y un ?ped=abc
+    # a mano rompia la pagina con un 500.
+    ped_ids = [x for x in request.args.getlist('ped') if x.strip().isdigit()]
     if 'suc' in request.args or 'lab' in request.args:
         filtro_suc = request.args.get('suc', '')
         filtro_lab = request.args.get('lab', '')
@@ -419,7 +421,9 @@ def generar_orden():
 def generar_orden_fragmento():
     """Solo la grilla de tarjetas, para refrescar sin recargar la página."""
     filtro_suc = request.args.get('suc', '')
-    ped_ids = [x for x in request.args.getlist('ped') if x.strip()]
+    # solo numericos: get_consolidado/get_items_detalle hacen int() y un ?ped=abc
+    # a mano rompia la pagina con un 500.
+    ped_ids = [x for x in request.args.getlist('ped') if x.strip().isdigit()]
     orden, _ = _armar_orden(filtro_suc, solicitud_ids=ped_ids or None)
     return render_template('_orden_grid.html', orden=orden)
 

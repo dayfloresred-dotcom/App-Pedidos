@@ -492,6 +492,12 @@ def cerrar_pedido_forzado(sol_id, modo='no_enviado'):
         marc = ','.join('?' * len(pend))
         conn.execute(f"UPDATE items_solicitud SET cancelado=1, drogueria_final='NO_ENVIADO' WHERE id IN ({marc})", pend)
     _recalc_estado_solicitud(conn, sol_id)
+    # Si se movieron TODOS los items, el original queda sin filas y
+    # _recalc_estado_solicitud sale por `if not rows: return` sin tocarlo: quedaba
+    # 'pendiente' y vacio, duplicado en la lista al lado del pedido nuevo.
+    if conn.execute("SELECT COUNT(*) AS c FROM items_solicitud WHERE solicitud_id=?",
+                    (sol_id,)).fetchone()['c'] == 0:
+        conn.execute("UPDATE solicitudes SET estado='cancelado', fecha_compra=NULL WHERE id=?", (sol_id,))
     conn.commit()
     conn.close()
     return {'ok': True, 'n': len(pend), 'nuevo_numero': nuevo_numero}
