@@ -37,6 +37,7 @@
       onclick="exportPedido('SUIZO')">↓ SUIZO (.arg)</button>
     {% endif %}
     <a class="btn btn-sm btn-suave" href="/reporte/rotacion.xlsx">↓ Rotación (.xlsx)</a>
+    <button class="btn btn-sm btn-suave" onclick="limpiarRotaciones()" title="Reiniciar el coloreado del reporte de rotación">🧹 Limpiar rotaciones</button>
   </div>
 </div>
 <div id="orden-grid">
@@ -271,6 +272,16 @@ async function cancelarProducto(sku) {
   const d = await res.json().catch(() => ({}));
   if (res.ok && d.ok) { toast('Producto cancelado', 'exito'); refrescarOrden(); }
   else toast(d.error || 'No se pudo cancelar', 'error');
+}
+
+async function limpiarRotaciones() {
+  const ok = await confirmar('El reporte de rotación va a arrancar de cero: deja de pintar las rotaciones marcadas hasta ahora. No borra nada; las nuevas rotaciones se vuelven a marcar.',
+    {titulo: '¿Limpiar rotaciones marcadas?', accion: 'Limpiar rotaciones', peligro: false});
+  if (!ok) return;
+  const res = await fetch('/api/orden/limpiar-rotaciones', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) { toast(`${d.n} rotación(es) reiniciadas`, 'exito'); }
+  else toast(d.error || 'No se pudo limpiar', 'error');
 }
 
 async function limpiarDiscontinuados() {

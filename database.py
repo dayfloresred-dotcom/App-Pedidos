@@ -639,11 +639,22 @@ def actualizar_comprado_por_envio(sucursal, sku):
     conn.commit()
     conn.close()
 
+def limpiar_rotaciones():
+    """Reinicia el coloreado del reporte de rotacion: marca las rotaciones actuales como
+    'ya consideradas' (exportado=1). No borra nada (auditoria intacta). Una rotacion nueva
+    vuelve a resetear exportado=0 via registrar_envio. Devuelve la cantidad reiniciada."""
+    conn = get_db()
+    cur = conn.execute("UPDATE envios SET exportado=1 WHERE drogueria='ROT' AND cantidad>0 AND (exportado IS NULL OR exportado=0)")
+    n = cur.rowcount
+    conn.commit()
+    conn.close()
+    return n
+
 def get_rotacion_marcada():
     """Set de (sucursal, sku) que el admin marcó como ROTACIÓN en Generar orden
     (envío con droguería 'ROT'). Se usa para resaltar esas filas en el reporte."""
     conn = get_db()
-    rows = conn.execute("SELECT sucursal, sku FROM envios WHERE drogueria='ROT' AND cantidad>0").fetchall()
+    rows = conn.execute("SELECT sucursal, sku FROM envios WHERE drogueria='ROT' AND cantidad>0 AND (exportado IS NULL OR exportado=0)").fetchall()
     conn.close()
     return {(str(r['sucursal']), str(r['sku'])) for r in rows}
 

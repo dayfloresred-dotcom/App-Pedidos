@@ -18,7 +18,7 @@ from auth import seed_users, verify_user, login_required, admin_required
 from mail_service import enviar_notificacion
 from export_service import generar_suizo, generar_sud, generar_quantio
 from config import FUENTES_CRON_TOKEN
-from database import get_fuentes_estado, agregar_mapeos_cd, get_rotacion_marcada
+from database import get_fuentes_estado, agregar_mapeos_cd, get_rotacion_marcada, limpiar_rotaciones
 from fuentes import refrescar_fuentes, NO_MATCH_JSON
 import fuentes as fuentes_mod
 
@@ -844,6 +844,13 @@ def exportar_quantio():
         mimetype='text/plain',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
+
+@app.route('/api/orden/limpiar-rotaciones', methods=['POST'])
+@login_required
+@admin_required
+def api_limpiar_rotaciones():
+    """Reinicia el coloreado del reporte de rotacion (marca las rotaciones actuales como consideradas)."""
+    return jsonify({'ok': True, 'n': limpiar_rotaciones()})
 
 @app.route('/reporte/rotacion.xlsx')
 @login_required
