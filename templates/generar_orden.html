@@ -15,9 +15,24 @@
       {% for l in labs_orden %}<option value="{{ l }}" {% if filtro_lab==l %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select>
     <span class="small text-muted">Pedido:</span>
-    <select name="ped" multiple size="3" class="form-select form-select-sm" style="width:auto;min-width:180px" title="Elegí uno o varios pedidos pendientes (Ctrl/Cmd para varios)">
-      {% for pe in pedidos_pendientes %}<option value="{{ pe.id }}" {% if pe.id|string in filtro_ped %}selected{% endif %}>{{ pe.numero }} · {{ pe.sucursal }}</option>{% endfor %}
-    </select>
+    <div class="dropdown" id="ped-dd">
+      <button type="button" class="form-select form-select-sm text-start" style="width:auto;min-width:180px"
+        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+        title="Elegí uno o varios pedidos pendientes">
+        <span id="ped-dd-label">Todos</span>
+      </button>
+      <div class="dropdown-menu p-1" style="max-height:280px;overflow:auto;min-width:240px">
+        {% for pe in pedidos_pendientes %}
+        <label class="dropdown-item d-flex align-items-center gap-2 px-2 py-1 mb-0" style="cursor:pointer">
+          <input class="form-check-input m-0 ped-chk" type="checkbox" name="ped" value="{{ pe.id }}"
+            {% if pe.id|string in filtro_ped %}checked{% endif %}>
+          <span class="small">{{ pe.numero }} · {{ pe.sucursal }}</span>
+        </label>
+        {% else %}
+        <div class="small text-muted px-2 py-1">No hay pedidos pendientes</div>
+        {% endfor %}
+      </div>
+    </div>
     <button type="submit" class="btn btn-sm btn-brand">Filtrar</button>
     {% if filtro_suc or filtro_lab or filtro_ped %}<a href="{{ url_for('generar_orden', suc='', lab='') }}" class="btn btn-sm btn-outline-secondary">✕ Limpiar</a>{% endif %}
   </form>
@@ -73,6 +88,20 @@ function toggleDet(rid, btn) {
 function filtroActual() {
   return new URLSearchParams(location.search).get('suc') || '';
 }
+
+function actualizarPedLabel(){
+  const chks=[...document.querySelectorAll('.ped-chk')];
+  const sel=chks.filter(c=>c.checked);
+  const lab=document.getElementById('ped-dd-label');
+  if(!lab) return;
+  if(sel.length===0) lab.textContent='Todos';
+  else if(sel.length===1) lab.textContent=sel[0].parentNode.querySelector('span').textContent.trim();
+  else lab.textContent=sel.length+' pedidos';
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  actualizarPedLabel();
+  document.querySelectorAll('.ped-chk').forEach(c=>c.addEventListener('change',actualizarPedLabel));
+});
 
 async function refrescarOrden() {
   const grid = document.getElementById('orden-grid');
