@@ -8,6 +8,9 @@ Deltas de nombres validados contra erp_mysql_schema_legacy.md y etl/etl.py
   - medicamentos: la PK/sku es CodPlex, no IDProducto.
   - laboratorios: la columna de nombre es Laborato, no Laboratorio.
   - productoscodebars: la columna del EAN es codebar (minuscula), no CodeBar.
+  - Presentación/tamaño: la columna es `Presentaci` (varchar(50), nombre
+    truncado en el schema), NO `Presentacion` ni `ProdPres` — esos dos son de
+    la tabla `productos` de Quantio/CD, `medicamentos` no los tiene.
   - EAN "principal": el ETL usa medicamentos.codebar como principal y
     productoscodebars como alternativos/secundarios (ver sync_dim_productos_eans
     en etl.py). Q_EANS replica ese orden de prioridad: primero el codebar de
@@ -33,7 +36,7 @@ EXCLUIR = {'17', '33'}  # mismo criterio que data_loader
 # (DOVE HIDRATACION INTENSA, ambos Activo='S' visible=0). Filtrar por visible
 # los borraría del catálogo.
 Q_PRODUCTOS = """
-    SELECT m.CodPlex AS sku, m.Producto AS descripcion,
+    SELECT m.CodPlex AS sku, m.Producto AS descripcion, m.Presentaci AS presentacion,
            l.Laborato AS laboratorio, r.Rubro AS rubro, m.Troquel AS troquel
     FROM medicamentos m
     LEFT JOIN laboratorios l ON l.CodLab = m.CodLab
@@ -122,6 +125,21 @@ def _nombre_sucursal(sucursal):
     return SUCURSALES.get(num)
 
 
+def _descripcion(producto, presentacion):
+    """Nombre completo = `Producto` + `Presentaci`.
+
+    `medicamentos.Producto` trae solo el nombre ('DOVE AC OLEO NUTRICION X');
+    el tamaño vive aparte en `Presentaci` ('200ML'). Con la descripción a secas
+    la app mostraba productos indistinguibles entre sí en todas las pantallas
+    (todas leen esta descripción del catálogo). Si el nombre ya termina con la
+    presentación no se repite."""
+    nombre = str(producto or '').strip()
+    pres   = str(presentacion or '').strip()
+    if not pres or nombre.upper().endswith(pres.upper()):
+        return nombre
+    return f'{nombre} {pres}'.strip()
+
+
 def transformar(rows_prod, rows_eans, rows_ventas, rows_stock):
     """Pura: filas SQL -> estructura del conector. Testeable sin conexión."""
     eans = {}
@@ -135,7 +153,7 @@ def transformar(rows_prod, rows_eans, rows_ventas, rows_stock):
     for r in rows_prod:
         sku = str(r['sku'])
         productos[sku] = {
-            'descripcion': str(r['descripcion'] or '').strip(),
+            'descripcion': _descripcion(r['descripcion'], r.get('presentacion')),
             'laboratorio': str(r['laboratorio'] or '').strip(),
             'rubro':       str(r['rubro'] or '').strip(),
             'ean':         eans.get(sku, ''),

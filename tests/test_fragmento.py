@@ -26,3 +26,10 @@ def test_fragmento_confirmado(sucursal):
     f = sucursal.get(f'/confirmado/{sol_id}/fragmento')
     assert f.status_code == 200
     assert b'Prueba' in f.data
+
+
+def test_filtro_ped_no_numerico_no_rompe(admin):
+    """get_consolidado/get_items_detalle hacen int() sobre los ids del filtro:
+    un ?ped= tocado a mano tiraba 500 en vez de ignorarse."""
+    assert admin.get('/generar-orden?ped=abc').status_code == 200
+    assert admin.get('/generar-orden/fragmento?suc=&ped=abc').status_code == 200

@@ -30,6 +30,30 @@ def test_transformar_arma_estructura():
     assert '777' not in r['ventas']
 
 
+def test_descripcion_incluye_la_presentacion():
+    """El tamaño vive en medicamentos.Presentaci, no en Producto: sin él la app
+    mostraba 'DOVE AC OLEO NUTRICION X' para el de 200ML y el de 400ML."""
+    rows_prod = [{'sku': 1, 'descripcion': 'DOVE AC OLEO NUTRICION X',
+                  'presentacion': '200ML', 'laboratorio': 'L', 'rubro': 'Perfumería', 'troquel': None}]
+    r = transformar(rows_prod, [], [], [])
+    assert r['productos']['1']['descripcion'] == 'DOVE AC OLEO NUTRICION X 200ML'
+
+
+def test_descripcion_sin_presentacion_o_repetida():
+    """Presentaci es NOT NULL DEFAULT '': con el campo vacío queda el nombre
+    solo, y si el nombre ya termina con la presentación no se duplica."""
+    assert fuentes_plex._descripcion('ZOLEPTIL', '') == 'ZOLEPTIL'
+    assert fuentes_plex._descripcion('ZOLEPTIL', None) == 'ZOLEPTIL'
+    assert fuentes_plex._descripcion('DOVE X 200ML', '200ml') == 'DOVE X 200ML'
+
+
+def test_q_productos_trae_la_presentacion():
+    """La columna es `Presentaci` (nombre truncado en el schema de Plex);
+    `Presentacion`/`ProdPres` son de la tabla `productos` de Quantio, no de
+    `medicamentos`."""
+    assert 'm.Presentaci AS presentacion' in Q_PRODUCTOS
+
+
 def test_q_ventas_suma_cant_decimal():
     """Las líneas fraccionadas (TipoCantidad='U') traen Cantidad en unidades
     sueltas; CantDecimal está SIEMPRE en cajas (verificado contra el informe
