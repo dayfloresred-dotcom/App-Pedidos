@@ -293,6 +293,9 @@ def marcar_item_generado(sku, sucursal, drogueria, fecha):
             SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'
         )
     ''', (drogueria, fecha, sku, sucursal))
+    for r in conn.execute("SELECT DISTINCT i.solicitud_id AS sid FROM items_solicitud i "
+            "JOIN solicitudes s ON s.id=i.solicitud_id WHERE i.sku=? AND s.sucursal=?", (sku, sucursal)).fetchall():
+        _recalc_estado_solicitud(conn, r['sid'])
     conn.commit()
     conn.close()
 
@@ -301,9 +304,12 @@ def desmarcar_item_generado(sku, sucursal):
     conn.execute('''
         UPDATE items_solicitud SET ordenado=0, drogueria_final=NULL, fecha_orden=NULL
         WHERE sku=? AND solicitud_id IN (
-            SELECT id FROM solicitudes WHERE sucursal=? AND estado='pendiente'
+            SELECT id FROM solicitudes WHERE sucursal=? AND estado IN ('pendiente','comprado')
         )
     ''', (sku, sucursal))
+    for r in conn.execute("SELECT DISTINCT i.solicitud_id AS sid FROM items_solicitud i "
+            "JOIN solicitudes s ON s.id=i.solicitud_id WHERE i.sku=? AND s.sucursal=?", (sku, sucursal)).fetchall():
+        _recalc_estado_solicitud(conn, r['sid'])
     conn.commit()
     conn.close()
 
@@ -311,17 +317,19 @@ def _recalc_estado_solicitud(conn, sol_id):
     """Recalcula el estado de la solicitud segun sus items:
     - todos cancelados -> 'cancelado'
     - todos los activos (no cancelados) comprados -> 'comprado' (con fecha)"""
-    rows = conn.execute("SELECT cancelado, comprado FROM items_solicitud WHERE solicitud_id=?", (sol_id,)).fetchall()
+    rows = conn.execute("SELECT cancelado, comprado, ordenado FROM items_solicitud WHERE solicitud_id=?", (sol_id,)).fetchall()
     if not rows:
         return
     if all(r['cancelado'] for r in rows):
         conn.execute("UPDATE solicitudes SET estado='cancelado' WHERE id=? AND estado!='cancelado'", (sol_id,))
         return
     activos = [r for r in rows if not r['cancelado']]
-    if activos and all(r['comprado'] for r in activos):
+    # Un item se considera resuelto si esta comprado (Pedido realizado) O tiene orden generada (Pedido generado).
+    resuelto = lambda r: r['comprado'] or r['ordenado']
+    if activos and all(resuelto(r) for r in activos):
         fecha = now_local().strftime('%d/%m/%Y')
         conn.execute("UPDATE solicitudes SET estado='comprado', fecha_compra=? WHERE id=? AND estado='pendiente'", (fecha, sol_id))
-    elif activos and any(not r['comprado'] for r in activos):
+    elif activos and any(not resuelto(r) for r in activos):
         conn.execute("UPDATE solicitudes SET estado='pendiente', fecha_compra=NULL WHERE id=? AND estado='comprado'", (sol_id,))
 
 def cancelar_producto(sku):
