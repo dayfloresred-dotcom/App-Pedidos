@@ -261,10 +261,14 @@ def get_items_detalle(sku, solicitud_ids=None):
     conn.close()
     return [dict(r) for r in rows]
 
-def get_pedidos_pendientes():
-    """Lista de pedidos pendientes (id, numero, sucursal) para el filtro de Generar orden."""
+def get_pedidos_pendientes(sucursal=None):
+    """Lista de pedidos pendientes (id, numero, sucursal) para el filtro de Generar orden.
+    Si se pasa sucursal, devuelve solo los pedidos abiertos de esa sucursal."""
     conn = get_db()
-    rows = conn.execute("SELECT id, numero, sucursal FROM solicitudes WHERE estado='pendiente' ORDER BY numero").fetchall()
+    if sucursal:
+        rows = conn.execute("SELECT id, numero, sucursal FROM solicitudes WHERE estado='pendiente' AND sucursal=? ORDER BY numero", (sucursal,)).fetchall()
+    else:
+        rows = conn.execute("SELECT id, numero, sucursal FROM solicitudes WHERE estado='pendiente' ORDER BY numero").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 

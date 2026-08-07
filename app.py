@@ -408,7 +408,7 @@ def generar_orden():
         sucs_orden=sucs_orden,
         labs_orden=labs_orden,
         sucursales=SUCURSAL_NAMES,
-        pedidos_pendientes=get_pedidos_pendientes(),
+        pedidos_pendientes=get_pedidos_pendientes(filtro_suc or None),
         filtro_ped=ped_ids,
         filtro_suc=filtro_suc,
         filtro_lab=filtro_lab,
