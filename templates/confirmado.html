@@ -93,7 +93,7 @@ async function restaurarItem(itemId) {
 }
 
 async function cerrarForzado() {
-  const r = await elegir('¿Qué hacemos con los productos que quedaron pendientes?',
+  const r = await elegir('Los que ya tienen orden generada quedan como realizados. ¿Qué hacemos con los que siguen pendientes (sin orden)?',
     [{valor: 'mover', label: 'Volver a Generar orden (pedido nuevo)', clase: 'btn-brand'},
      {valor: 'no_enviado', label: 'Dejarlos como \'No enviado\'', clase: 'btn-suave'}],
     '¿Forzar el cierre del pedido?');

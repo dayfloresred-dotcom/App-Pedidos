@@ -471,8 +471,13 @@ def cerrar_pedido_forzado(sol_id, modo='no_enviado'):
     sol = conn.execute("SELECT * FROM solicitudes WHERE id=?", (sol_id,)).fetchone()
     if not sol:
         conn.close(); return {'ok': False, 'error': 'Pedido no encontrado'}
+    # 'Pedido generado' (orden ya generada, sin comprar) se considera resuelto: queda en el
+    # pedido original como comprado para que el pedido pueda cerrarse (y no se pide dos veces).
+    conn.execute("UPDATE items_solicitud SET comprado=1 "
+                 "WHERE solicitud_id=? AND cancelado=0 AND comprado=0 AND ordenado=1", (sol_id,))
+    # Solo los pendientes puros (sin orden generada) se mueven o pasan a 'No enviado'.
     pend = [r['id'] for r in conn.execute(
-        "SELECT id FROM items_solicitud WHERE solicitud_id=? AND cancelado=0 AND comprado=0", (sol_id,)).fetchall()]
+        "SELECT id FROM items_solicitud WHERE solicitud_id=? AND cancelado=0 AND comprado=0 AND ordenado=0", (sol_id,)).fetchall()]
     nuevo_numero = None
     if modo == 'mover' and pend:
         base = re.sub(r'-[A-Z]$', '', sol['numero'])
