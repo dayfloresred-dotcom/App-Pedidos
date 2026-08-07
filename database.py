@@ -307,6 +307,9 @@ def desmarcar_item_generado(sku, sucursal):
             SELECT id FROM solicitudes WHERE sucursal=? AND estado IN ('pendiente','comprado')
         )
     ''', (sku, sucursal))
+    # Al deshacer la orden generada, se limpia el envio/rotacion asociado (si no, queda
+    # un envio fantasma que oculta el producto en Generar orden).
+    conn.execute("DELETE FROM envios WHERE sucursal=? AND sku=?", (sucursal, sku))
     for r in conn.execute("SELECT DISTINCT i.solicitud_id AS sid FROM items_solicitud i "
             "JOIN solicitudes s ON s.id=i.solicitud_id WHERE i.sku=? AND s.sucursal=?", (sku, sucursal)).fetchall():
         _recalc_estado_solicitud(conn, r['sid'])
@@ -504,7 +507,16 @@ def cerrar_pedido_forzado(sol_id, modo='no_enviado'):
                      "VALUES (?,?,?,?, 'pendiente')", (nuevo_numero, sol['sucursal'], sol['creado_por'], fecha))
         new_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         marc = ','.join('?' * len(pend))
-        conn.execute(f"UPDATE items_solicitud SET solicitud_id=? WHERE id IN ({marc})", [new_id, *pend])
+        # Vuelven FRESCOS a Generar orden: sin estado de orden y sin envios/rotacion
+        # colgados (si no, un envio fantasma los ocultaria de las tarjetas).
+        skus_mov = [r['sku'] for r in conn.execute(
+            f"SELECT DISTINCT sku FROM items_solicitud WHERE id IN ({marc})", pend).fetchall()]
+        conn.execute(f"UPDATE items_solicitud SET solicitud_id=?, ordenado=0, "
+                     f"drogueria_final=NULL, fecha_orden=NULL WHERE id IN ({marc})", [new_id, *pend])
+        if skus_mov:
+            sm = ','.join('?' * len(skus_mov))
+            conn.execute(f"DELETE FROM envios WHERE sucursal=? AND sku IN ({sm})",
+                         [sol['sucursal'], *skus_mov])
     elif pend:
         marc = ','.join('?' * len(pend))
         conn.execute(f"UPDATE items_solicitud SET cancelado=1, drogueria_final='NO_ENVIADO' WHERE id IN ({marc})", pend)
