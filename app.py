@@ -79,23 +79,27 @@ def nueva_solicitud():
 def mis_pedidos():
     # Recuerda los filtros (sucursal + drogueria + producto) en la sesion: si vienen
     # en la URL los guarda; si no (al volver por el menu) reusa los ultimos.
-    if any(k in request.args for k in ('suc', 'drog', 'q', 'lab')):
+    if any(k in request.args for k in ('suc', 'drog', 'q', 'lab', 'estado')):
         filtro_suc  = request.args.get('suc', '')
         filtro_drog = request.args.get('drog', '')
         filtro_q    = request.args.get('q', '').strip()
         filtro_lab  = request.args.get('lab', '').strip()
-        session['mis_pedidos_filtros'] = {'suc': filtro_suc, 'drog': filtro_drog, 'q': filtro_q, 'lab': filtro_lab}
+        filtro_estado = request.args.get('estado', '').strip()
+        session['mis_pedidos_filtros'] = {'suc': filtro_suc, 'drog': filtro_drog, 'q': filtro_q, 'lab': filtro_lab, 'estado': filtro_estado}
     else:
         f = session.get('mis_pedidos_filtros', {})
         filtro_suc, filtro_drog, filtro_q, filtro_lab = f.get('suc',''), f.get('drog',''), f.get('q',''), f.get('lab','')
+        filtro_estado = f.get('estado','')
     suc = filtro_suc if session.get('rol') == 'admin' else session['username']
     solic = get_todas_solicitudes(sucursal_filtro=suc or None,
                                   drogueria_filtro=filtro_drog or None,
                                   q_filtro=filtro_q or None,
-                                  lab_filtro=filtro_lab or None)
+                                  lab_filtro=filtro_lab or None,
+                                  estado_filtro=filtro_estado or None)
     return render_template('mis_pedidos.html',
         solicitudes=solic, sucursales=SUCURSAL_NAMES, laboratorios=get_laboratorios(),
-        filtro_suc=filtro_suc, filtro_drog=filtro_drog, filtro_q=filtro_q, filtro_lab=filtro_lab)
+        filtro_suc=filtro_suc, filtro_drog=filtro_drog, filtro_q=filtro_q, filtro_lab=filtro_lab,
+        filtro_estado=filtro_estado)
 
 def _completar_descripciones(items):
     """Completa/actualiza la descripcion de cada item con la del catalogo (nombre

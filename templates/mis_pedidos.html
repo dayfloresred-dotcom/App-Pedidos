@@ -25,6 +25,15 @@
       </select>
     </div>
     <div class="col-auto">
+      <label class="form-label small mb-1">Estado</label>
+      <select name="estado" class="form-select form-select-sm" style="width:160px">
+        <option value="">Todos</option>
+        <option value="pendiente" {% if filtro_estado=='pendiente' %}selected{% endif %}>Pendiente</option>
+        <option value="comprado" {% if filtro_estado=='comprado' %}selected{% endif %}>Pedido realizado</option>
+        <option value="cancelado" {% if filtro_estado=='cancelado' %}selected{% endif %}>Cancelado</option>
+      </select>
+    </div>
+    <div class="col-auto">
       <label class="form-label small mb-1">Laboratorio</label>
       <input type="text" name="lab" value="{{ filtro_lab }}" list="mp-lab-list" class="form-control form-control-sm" style="width:180px" placeholder="Laboratorio">
       <datalist id="mp-lab-list">{% for l in laboratorios %}<option value="{{ l }}">{% endfor %}</datalist>

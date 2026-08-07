@@ -179,13 +179,15 @@ def get_solicitud_detalle(sol_id):
         return None, []
     return dict(sol), [dict(i) for i in items]
 
-def get_todas_solicitudes(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None, q_filtro=None):
+def get_todas_solicitudes(sucursal_filtro=None, lab_filtro=None, drogueria_filtro=None, q_filtro=None, estado_filtro=None):
     conn = get_db()
     query = 'SELECT s.*, COUNT(i.id) as n_items FROM solicitudes s LEFT JOIN items_solicitud i ON i.solicitud_id=s.id AND i.cancelado=0'
     params = []
     wheres = []
     if sucursal_filtro:
         wheres.append('s.sucursal=?'); params.append(sucursal_filtro)
+    if estado_filtro:
+        wheres.append('s.estado=?'); params.append(estado_filtro)
     if lab_filtro:
         wheres.append("EXISTS (SELECT 1 FROM items_solicitud li WHERE li.solicitud_id=s.id "
                       "AND li.cancelado=0 AND li.laboratorio LIKE ?)")
