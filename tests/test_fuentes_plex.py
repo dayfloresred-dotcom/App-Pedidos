@@ -62,18 +62,18 @@ def test_q_ventas_suma_cant_decimal():
     assert '-fl.Cantidad ELSE fl.Cantidad' not in Q_VENTAS
 
 
-def test_q_productos_filtra_discontinuados_por_activo():
-    """El catálogo de Plex trae discontinuados; medicamentos.Activo='N' los
-    marca. Sin este filtro entran a la app productos que ya no se reponen
-    (verificado 2026-07-23: 40,7% del catálogo tenía Activo='N')."""
-    assert "m.Activo = 'S'" in Q_PRODUCTOS
+def test_q_productos_filtra_ocultos_por_visible():
+    """El catálogo de Plex trae ocultos/discontinuados. El campo `visible`
+    (1=vigente, 0=oculto) es la señal correcta: verificado 2026-08-21 comparando
+    los listados de Plex con/sin ocultos, el listado limpio son EXACTAMENTE los
+    visible=1 (49.457, sin excepción)."""
+    assert 'm.visible = 1' in Q_PRODUCTOS
 
 
-def test_q_productos_no_filtra_por_visible():
-    """`visible` NO sirve como señal de vigencia: productos vigentes tienen
-    visible=0 (verificado 2026-07-23 contra los SKU 3002602024 y 3002602032,
-    ambos Activo='S' y visible=0). Filtrar por visible=1 los borraría."""
-    assert 'visible' not in Q_PRODUCTOS
+def test_q_productos_no_filtra_solo_por_activo():
+    """`Activo='S'` NO alcanza: dejaba pasar 54.535 ocultos (Activo='S' visible=0)
+    y descartaba 99 vigentes (Activo='N' visible=1). Se filtra por visible, no Activo."""
+    assert "m.Activo = 'S'" not in Q_PRODUCTOS
 
 
 def test_transformar_ventas_decimales_truncan_a_cajas():

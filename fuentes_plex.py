@@ -27,21 +27,24 @@ from config import (PLEX, PLEX_FALLBACK, SUCURSALES, VENTAS_VENTANA_DIAS,
 
 EXCLUIR = {'17', '33'}  # mismo criterio que data_loader
 
-# Vigencia: `medicamentos` arrastra el histórico completo, y los discontinuados
-# entraban al catálogo cuando les quedaba alguna fila de stock (Q_STOCK trae
-# Cantidad IS NOT NULL, no > 0). Se filtra por Activo='S'.
-# NO se filtra por `visible`: pese a lo que sugiere erp_mysql_schema_legacy.md
-# (que cuenta "activos" como Activo='S' AND visible=1), hay productos vigentes
-# con visible=0 — verificado 2026-07-23 sobre los SKU 3002602024 y 3002602032
-# (DOVE HIDRATACION INTENSA, ambos Activo='S' visible=0). Filtrar por visible
-# los borraría del catálogo.
+# Vigencia / "ocultos": `medicamentos` arrastra el histórico completo. El campo
+# que distingue lo vigente de lo oculto es `visible` (1=vigente, 0=oculto), NO
+# `Activo`. Verificado 2026-08-21 comparando los listados de Plex "con ocultos"
+# y "sin ocultos": el listado limpio son EXACTAMENTE los visible=1 (49.457, sin
+# una sola excepción). En cambio `Activo='S'` estaba mal por partida doble:
+#   - dejaba pasar 54.535 ocultos (Activo='S' pero visible=0), que aparecían en
+#     la app (p. ej. duplicados con laboratorio "DROGUERIA BARRACAS"), y
+#   - descartaba 99 productos vigentes (Activo='N' pero visible=1).
+# Por eso se filtra por visible=1 y NO por Activo.
+# NOTA: confirmar con Eze que en `medicamentos` la columna sea `visible` con
+# valores 1/0 (en el export CSV figura como S/N). Si fuera texto, sería visible='S'.
 Q_PRODUCTOS = """
     SELECT m.CodPlex AS sku, m.Producto AS descripcion, m.Presentaci AS presentacion,
            l.Laborato AS laboratorio, r.Rubro AS rubro, m.Troquel AS troquel
     FROM medicamentos m
     LEFT JOIN laboratorios l ON l.CodLab = m.CodLab
     LEFT JOIN rubros r ON r.CodRubro = m.CodRubro
-    WHERE m.Activo = 'S'
+    WHERE m.visible = 1
     {filtro_rubros}
 """
 
