@@ -352,6 +352,11 @@ def _armar_orden(filtro_suc, solicitud_ids=None):
                 if vis:
                     orden[code_drog].append(item_card(base_item, vis, code_drog, False))
             else:
+                # Ocultar las sucursales ya cubiertas por rotación (mismo criterio que
+                # las tarjetas de droguería); si no queda ninguna, no se muestra la tarjeta.
+                vis = visibles(dets, sku, '')
+                if not vis:
+                    continue
                 _sr = base.get('stock_real', {}) or {}
                 _vt = base.get('ventas', {}) or {}
                 donantes = sorted(
@@ -359,8 +364,8 @@ def _armar_orden(filtro_suc, solicitud_ids=None):
                      for su in _sr if int(_sr.get(su, 0)) > 0 and int(_vt.get(su, 0)) == 0],
                     key=lambda x: -x['stock'])
                 orden['SIN_PRECIO'].append({**base_item, 'es_overflow': False,
-                    'detalle_suc': dets, 'drog_code': '', 'donantes': donantes,
-                    'sucursales_str': chips_de(dets)})
+                    'detalle_suc': vis, 'drog_code': '', 'donantes': donantes,
+                    'sucursales_str': chips_de(vis)})
 
     conn = get_db()
     sucs_set = {r['sucursal'] for r in conn.execute(
