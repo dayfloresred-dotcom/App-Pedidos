@@ -63,17 +63,18 @@ def test_q_ventas_suma_cant_decimal():
 
 
 def test_q_productos_filtra_ocultos_por_visible():
-    """El catálogo de Plex trae ocultos/discontinuados. El campo `visible`
-    (1=vigente, 0=oculto) es la señal correcta: verificado 2026-08-21 comparando
-    los listados de Plex con/sin ocultos, el listado limpio son EXACTAMENTE los
-    visible=1 (49.457, sin excepción)."""
-    assert 'm.visible = 1' in Q_PRODUCTOS
+    """Filtra por `visible` (tinyint 1/0, default 1). COALESCE por las filas con
+    visible NULL, que por el default deben quedar dentro."""
+    assert 'COALESCE(m.visible, 1) = 1' in Q_PRODUCTOS
 
 
-def test_q_productos_no_filtra_solo_por_activo():
-    """`Activo='S'` NO alcanza: dejaba pasar 54.535 ocultos (Activo='S' visible=0)
-    y descartaba 99 vigentes (Activo='N' visible=1). Se filtra por visible, no Activo."""
-    assert "m.Activo = 'S'" not in Q_PRODUCTOS
+def test_q_productos_saca_solo_duplicados_ocultos():
+    """No filtra por visible a secas (perdería medicamentos ocultos que se venden):
+    saca solo los ocultos que tienen un gemelo VISIBLE del mismo codebar, y conserva
+    los huérfanos (Activo='S' sin gemelo visible)."""
+    assert 'NOT EXISTS' in Q_PRODUCTOS
+    assert 'v.codebar = m.codebar' in Q_PRODUCTOS
+    assert 'v.visible = 1' in Q_PRODUCTOS
 
 
 def test_transformar_ventas_decimales_truncan_a_cajas():

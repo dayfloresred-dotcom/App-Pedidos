@@ -27,24 +27,33 @@ from config import (PLEX, PLEX_FALLBACK, SUCURSALES, VENTAS_VENTANA_DIAS,
 
 EXCLUIR = {'17', '33'}  # mismo criterio que data_loader
 
-# Vigencia / "ocultos": `medicamentos` arrastra el histórico completo. El campo
-# que distingue lo vigente de lo oculto es `visible` (1=vigente, 0=oculto), NO
-# `Activo`. Verificado 2026-08-21 comparando los listados de Plex "con ocultos"
-# y "sin ocultos": el listado limpio son EXACTAMENTE los visible=1 (49.457, sin
-# una sola excepción). En cambio `Activo='S'` estaba mal por partida doble:
-#   - dejaba pasar 54.535 ocultos (Activo='S' pero visible=0), que aparecían en
-#     la app (p. ej. duplicados con laboratorio "DROGUERIA BARRACAS"), y
-#   - descartaba 99 productos vigentes (Activo='N' pero visible=1).
-# Por eso se filtra por visible=1 y NO por Activo.
-# NOTA: confirmar con Eze que en `medicamentos` la columna sea `visible` con
-# valores 1/0 (en el export CSV figura como S/N). Si fuera texto, sería visible='S'.
+# Ocultos / duplicados: `medicamentos` arrastra el histórico completo y trae
+# duplicados ocultos del mismo EAN (p. ej. laboratorio "DROGUERIA BARRACAS"),
+# que se colaban porque `Activo='S'` no los filtra (tienen Activo='S' visible=0).
+# El flag correcto es `visible` (tinyint 1/0, default 1; confirmado por Eze
+# 2026-08-27). PERO visible=0 NO significa "no se vende": medido sobre el
+# catálogo real de la app (tras el filtro por venta/stock), `visible=1` a secas
+# sacaba 60 productos — 29 duplicados (bien) pero 31 sin gemelo, de los cuales 8
+# son medicamentos que SÍ se venden (AMLODIPINA, BUSCAPINA DUO, PHARMATON,
+# GENOPRAZOL, PERVINOX, ALERGICAL, NEUMOTEX, CARBOPLATINO). `visible` parece ser
+# visibilidad de e-commerce, no de mostrador.
+# Por eso el criterio es: incluir si está visible, O si (Activo='S' y NO tiene un
+# gemelo visible con el mismo codebar). Así se van SOLO los duplicados ocultos y
+# se conservan los medicamentos huérfanos. COALESCE(visible,1) por las 5 filas
+# con visible NULL (una con ventas: CARQUEJA TROP), que por el default=1 quedan.
+# El contraejemplo viejo (DOVE HIDRATACION INTENSA, SKU 3002602024/3002602032)
+# hoy no tiene venta ni stock, así que queda afuera con cualquiera de los dos.
 Q_PRODUCTOS = """
     SELECT m.CodPlex AS sku, m.Producto AS descripcion, m.Presentaci AS presentacion,
            l.Laborato AS laboratorio, r.Rubro AS rubro, m.Troquel AS troquel
     FROM medicamentos m
     LEFT JOIN laboratorios l ON l.CodLab = m.CodLab
     LEFT JOIN rubros r ON r.CodRubro = m.CodRubro
-    WHERE m.visible = 1
+    WHERE (COALESCE(m.visible, 1) = 1
+           OR (m.Activo = 'S' AND NOT EXISTS (
+               SELECT 1 FROM medicamentos v
+               WHERE v.codebar = m.codebar AND v.codebar <> ''
+                 AND v.visible = 1 AND v.CodPlex <> m.CodPlex)))
     {filtro_rubros}
 """
 
