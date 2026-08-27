@@ -165,19 +165,41 @@ function exportPedido(code) {
   descargar(url, {sucursal: sel.value}, 'pedido_' + code.toLowerCase());
 }
 
+// Si se envía menos de lo solicitado, pregunta qué hacer con las faltantes.
+// Devuelve 'full' (completo, sin cartel), 'cerrar', 'subpedido' o null (cancelado).
+async function _preguntarFaltante(inp, cant, suc) {
+  const solicitado = parseInt(inp.dataset.solicitado, 10) || cant;
+  if (cant >= solicitado) return 'full';
+  const falt = solicitado - cant;
+  return await elegir(
+    `Estás por enviar ${cant} de ${solicitado} solicitadas para ${suc}. Faltan ${falt} unidad(es).`,
+    [{valor: 'subpedido', label: `Generar sub-pedido con las ${falt} faltantes`, clase: 'btn-brand'},
+     {valor: 'cerrar', label: 'Cerrar el producto como enviado (descartar faltantes)', clase: 'btn-suave'}],
+    '¿Enviás menos de lo solicitado?');
+}
+
+function _msgFaltante(base, modo, d) {
+  if (modo === 'subpedido' && d.subpedido) return `${base} — faltantes → ${d.subpedido}`;
+  if (modo === 'cerrar') return `${base} — producto cerrado como enviado`;
+  return base;
+}
+
 async function enviarItem(sku, suc, code, btn) {
   const pill = btn.closest('div');
   const inp  = pill.querySelector('.env-input');
   const cant = parseInt(inp.value, 10) || 0;
   if (cant <= 0) { toast('Poné una cantidad mayor a 0', 'error'); return; }
+  const modo = await _preguntarFaltante(inp, cant, suc);
+  if (!modo) return;                                  // canceló el cartel
+  const faltante_modo = (modo === 'full') ? null : modo;
   setLoading(btn, true);
   const res = await fetch('/api/orden/enviar', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({sku, sucursal: suc, drogueria: code, cantidad: cant})
+    body: JSON.stringify({sku, sucursal: suc, drogueria: code, cantidad: cant, faltante_modo})
   });
   const d = await res.json().catch(() => ({}));
   if (res.ok && d.ok) {
-    toast(`Envío registrado — ${suc} · ${cant} u. desde ${code}`, 'exito');
+    toast(_msgFaltante(`Envío registrado — ${suc} · ${cant} u. desde ${code}`, faltante_modo, d), 'exito');
     await refrescarOrden();
     setLoading(btn, false);
   } else {
@@ -191,17 +213,22 @@ async function rotacionItem(sku, suc, btn) {
   const inp  = pill.querySelector('.env-input');
   const cant = parseInt(inp.value, 10) || 0;
   if (cant <= 0) { toast('Poné una cantidad mayor a 0', 'error'); return; }
-  const ok = await confirmar(`Se cubren ${cant} u. de ${suc} con stock interno (rotación).`,
-    {titulo: '¿Cubrir por rotación?', accion: 'Cubrir por rotación', peligro: false});
-  if (!ok) return;
+  const modo = await _preguntarFaltante(inp, cant, suc);
+  if (!modo) return;                                  // canceló el cartel
+  if (modo === 'full') {
+    const ok = await confirmar(`Se cubren ${cant} u. de ${suc} con stock interno (rotación).`,
+      {titulo: '¿Cubrir por rotación?', accion: 'Cubrir por rotación', peligro: false});
+    if (!ok) return;
+  }
+  const faltante_modo = (modo === 'full') ? null : modo;
   setLoading(btn, true);
   const res = await fetch('/api/orden/rotacion', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({sku, sucursal: suc, cantidad: cant})
+    body: JSON.stringify({sku, sucursal: suc, cantidad: cant, faltante_modo})
   });
   const d = await res.json().catch(() => ({}));
   if (res.ok && d.ok) {
-    toast(`Rotación registrada — ${suc} · ${cant} u.`, 'exito');
+    toast(_msgFaltante(`Rotación registrada — ${suc} · ${cant} u.`, faltante_modo, d), 'exito');
     await refrescarOrden();
     setLoading(btn, false);
   } else {

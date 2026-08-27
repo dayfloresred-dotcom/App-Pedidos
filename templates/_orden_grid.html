@@ -80,7 +80,7 @@
                       <input type="number" min="0" value="{{ d.cantidad }}" style="width:52px"
                         class="form-control form-control-sm env-input"
                         data-sku="{{ it.sku }}" data-sucursal="{{ d.sucursal }}" data-code="{{ it.drog_code }}"
-                        title="Cantidad a enviar">
+                        data-solicitado="{{ d.cantidad }}" title="Cantidad a enviar">
                       <button class="btn btn-sm btn-outline-success py-0 px-2"
                         onclick="enviarItem('{{ it.sku }}','{{ d.sucursal }}','{{ it.drog_code }}', this)">Enviar</button>
                       <button class="btn btn-sm btn-outline-primary py-0 px-2" title="Cubrir por rotación (stock interno)"
@@ -91,7 +91,7 @@
                       <input type="number" min="0" value="{{ d.cantidad }}" style="width:52px"
                         class="form-control form-control-sm env-input"
                         data-sku="{{ it.sku }}" data-sucursal="{{ d.sucursal }}"
-                        title="Unidades a cubrir por rotación">
+                        data-solicitado="{{ d.cantidad }}" title="Unidades a cubrir por rotación">
                       <button class="btn btn-sm btn-outline-primary py-0 px-2" title="Cubrir por rotación (stock interno)"
                         onclick="rotacionItem('{{ it.sku }}','{{ d.sucursal }}', this)">Cubrir por rotación</button>
                       <button class="btn btn-sm btn-link text-danger p-0" title="Quitar / cancelar / sin necesidad"

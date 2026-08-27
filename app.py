@@ -11,7 +11,7 @@ from database import (init_db, crear_solicitud, get_solicitud_detalle, get_todas
                        marcar_comprado_drogueria, marcar_inexistente, cerrar_pedido_forzado,
                        registrar_envio, get_envios, get_envios_sucursal, get_envios_por_drogueria,
                        get_envios_sucursal_drogueria, marcar_envios_exportados, omitir_drogueria, omitir_producto, restaurar_item, get_item_sku, set_item_drogueria, get_pedidos_pendientes,
-                       actualizar_comprado_por_envio,
+                       actualizar_comprado_por_envio, cerrar_item_enviado_parcial, agregar_faltante_subpedido,
                        carrito_set, carrito_set_obs, get_carrito, carrito_clear, get_ranking)
 from data_loader import buscar_productos, get_laboratorios, load_productos
 from auth import seed_users, verify_user, login_required, admin_required
@@ -586,6 +586,24 @@ def api_inexistente():
             marcar_inexistente(sku)
     return jsonify({'ok': True, 'n': len(skus)})
 
+def _aplicar_faltante(sku, suc, cant, modo):
+    """Cuando el admin envió MENOS de lo solicitado y eligió qué hacer con las
+    faltantes: cierra el producto como enviado (comprado) y, si eligió 'subpedido',
+    suma las faltantes al sub-pedido de faltantes del día de esa sucursal.
+    Devuelve {faltante, subpedido} o None si no aplica (envío normal)."""
+    if modo not in ('cerrar', 'subpedido'):
+        return None
+    req = cerrar_item_enviado_parcial(sku, suc)
+    faltante = max(0, req - cant)
+    numero = None
+    if modo == 'subpedido' and faltante > 0:
+        p = {pp['sku']: pp for pp in load_productos()}.get(sku, {})
+        item = {'sku': sku, 'ean': p.get('ean', ''), 'descripcion': p.get('descripcion', ''),
+                'laboratorio': p.get('laboratorio', ''), 'drogueria': p.get('drogueria', '')}
+        numero = agregar_faltante_subpedido(suc, item, faltante)
+    return {'faltante': faltante, 'subpedido': numero}
+
+
 @app.route('/api/orden/enviar', methods=['POST'])
 @login_required
 @admin_required
@@ -604,8 +622,11 @@ def api_enviar():
     registrar_envio(suc, sku, drog, cant, usuario=session.get('username'))
     if cant > 0:
         marcar_item_generado(sku, suc, drog, now_local().strftime('%d/%m/%Y'))
-    actualizar_comprado_por_envio(suc, sku)
-    return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
+    resp = _aplicar_faltante(sku, suc, cant, data.get('faltante_modo'))
+    if resp is None:
+        actualizar_comprado_por_envio(suc, sku)
+        return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
+    return jsonify({'ok': True, 'enviado': get_envios(suc, sku), **resp})
 
 @app.route('/api/orden/generar-item', methods=['POST'])
 @login_required
@@ -731,8 +752,11 @@ def api_rotacion():
     registrar_envio(suc, sku, 'ROT', cant, usuario=session.get('username'))
     if cant > 0:
         marcar_item_generado(sku, suc, 'ROT', now_local().strftime('%d/%m/%Y'))
-    actualizar_comprado_por_envio(suc, sku)
-    return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
+    resp = _aplicar_faltante(sku, suc, cant, data.get('faltante_modo'))
+    if resp is None:
+        actualizar_comprado_por_envio(suc, sku)
+        return jsonify({'ok': True, 'enviado': get_envios(suc, sku)})
+    return jsonify({'ok': True, 'enviado': get_envios(suc, sku), **resp})
 
 @app.route('/api/orden/omitir', methods=['POST'])
 @login_required

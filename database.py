@@ -676,6 +676,77 @@ def actualizar_comprado_por_envio(sucursal, sku):
     conn.commit()
     conn.close()
 
+def cerrar_item_enviado_parcial(sku, sucursal):
+    """Cierra como 'Pedido realizado' (comprado) los items pendientes de un producto
+    para una sucursal, aunque lo enviado sea MENOR a lo solicitado. Excluye los
+    sub-pedidos de faltantes (FALT-*) para no cerrar faltantes acumulados aparte.
+    Devuelve el total solicitado (para calcular la cantidad faltante)."""
+    conn = get_db()
+    # incluye 'comprado' porque el pedido puede haberse auto-cerrado al marcar
+    # el item como generado (ordenado cuenta como resuelto en el recálculo).
+    sub = ("SELECT id FROM solicitudes WHERE sucursal=? AND estado IN ('pendiente','comprado') "
+           "AND numero NOT LIKE 'FALT-%'")
+    req = conn.execute(
+        f"SELECT COALESCE(SUM(cantidad),0) FROM items_solicitud "
+        f"WHERE sku=? AND cancelado=0 AND comprado=0 AND solicitud_id IN ({sub})",
+        (sku, sucursal)).fetchone()[0]
+    fecha = now_local().strftime('%d/%m/%Y')
+    conn.execute(
+        f"UPDATE items_solicitud SET comprado=1, ordenado=1, fecha_orden=? "
+        f"WHERE sku=? AND cancelado=0 AND comprado=0 AND solicitud_id IN ({sub})",
+        (fecha, sku, sucursal))
+    for r in conn.execute(
+            "SELECT DISTINCT i.solicitud_id AS sid FROM items_solicitud i "
+            "JOIN solicitudes s ON s.id=i.solicitud_id "
+            "WHERE i.sku=? AND s.sucursal=? AND s.numero NOT LIKE 'FALT-%'",
+            (sku, sucursal)).fetchall():
+        _recalc_estado_solicitud(conn, r['sid'])
+    conn.commit()
+    conn.close()
+    return int(req)
+
+
+def agregar_faltante_subpedido(sucursal, item, faltante):
+    """Suma 'faltante' unidades de un producto al sub-pedido de faltantes del DIA
+    de esa sucursal (uno por sucursal por dia). Lo crea si no existe; si el producto
+    ya estaba, acumula la cantidad. item = dict(sku, ean, descripcion, laboratorio,
+    drogueria). Devuelve el numero del sub-pedido, o None si faltante<=0."""
+    if faltante <= 0:
+        return None
+    conn = get_db()
+    numero = f"FALT-{now_local().strftime('%d%m%y')}-{sucursal}"
+    row = conn.execute("SELECT id FROM solicitudes WHERE numero=?", (numero,)).fetchone()
+    if row:
+        sid = row['id']
+        conn.execute("UPDATE solicitudes SET estado='pendiente' WHERE id=? AND estado!='pendiente'", (sid,))
+    else:
+        fecha = now_local().strftime('%d/%m/%Y %H:%M')
+        conn.execute("INSERT INTO solicitudes (numero, sucursal, creado_por, fecha_solicitud, estado) "
+                     "VALUES (?,?,?,?, 'pendiente')", (numero, sucursal, 'faltantes', fecha))
+        sid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    # Droguería: la del catálogo; si no vino, la del último item de ese producto
+    # en la sucursal (para que el faltante caiga en la tarjeta correcta).
+    drog = (item.get('drogueria') or '').strip()
+    if not drog:
+        prev = conn.execute(
+            "SELECT i.drogueria AS d FROM items_solicitud i JOIN solicitudes s ON s.id=i.solicitud_id "
+            "WHERE i.sku=? AND s.sucursal=? AND COALESCE(i.drogueria,'')!='' ORDER BY i.id DESC LIMIT 1",
+            (item['sku'], sucursal)).fetchone()
+        drog = (prev['d'] if prev else '') or ''
+    it = conn.execute("SELECT id FROM items_solicitud WHERE solicitud_id=? AND sku=? AND cancelado=0",
+                      (sid, item['sku'])).fetchone()
+    if it:
+        conn.execute("UPDATE items_solicitud SET cantidad=cantidad+? WHERE id=?", (faltante, it['id']))
+    else:
+        conn.execute("INSERT INTO items_solicitud (solicitud_id, sku, ean, descripcion, laboratorio, cantidad, drogueria) "
+                     "VALUES (?,?,?,?,?,?,?)",
+                     (sid, item['sku'], item.get('ean',''), item.get('descripcion',''),
+                      item.get('laboratorio',''), faltante, drog))
+    conn.commit()
+    conn.close()
+    return numero
+
+
 def limpiar_rotaciones():
     """Reinicia el coloreado del reporte de rotacion: marca las rotaciones actuales como
     'ya consideradas' (exportado=1). No borra nada (auditoria intacta). Una rotacion nueva
