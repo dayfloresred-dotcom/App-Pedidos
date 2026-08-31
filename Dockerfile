@@ -13,4 +13,4 @@ EXPOSE 8080
 
 # La app cachea el catalogo de productos en memoria del proceso:
 # mantener SIEMPRE --workers 1 (mas workers = caches inconsistentes).
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--timeout", "120", "--workers", "1"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--timeout", "300", "--workers", "1"]
