@@ -99,3 +99,6 @@ VENTAS_VENTANA_DIAS = int(os.environ.get('VENTAS_VENTANA_DIAS') or 60)
 FUENTES_RUBROS      = [s.strip() for s in
                        (os.environ.get('FUENTES_RUBROS') or '').split(',') if s.strip()]
 FUENTES_CRON_TOKEN  = os.environ.get('FUENTES_CRON_TOKEN', '')
+# Ajuste temporal del stock de Posadas I (confirmación duplicada del 15/09,
+# ver fuentes_plex). AJUSTE_STOCK_POSADAS1=0 lo apaga entero.
+AJUSTE_STOCK_POSADAS1 = os.environ.get('AJUSTE_STOCK_POSADAS1') != '0'

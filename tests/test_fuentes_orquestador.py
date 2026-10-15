@@ -156,3 +156,19 @@ def test_relevancia_conserva_stock_cd_aunque_sucursales_en_cero():
     precios = {'precios': {}, 'precios_ean': {}, 'alfabeta': {}, 'alfabeta_ean': {},
                'mas_reciente': None, 'stale': False}
     assert [p['sku'] for p in fuentes.construir_catalogo(plex, precios, {'9': 7})] == ['9']
+
+
+def test_refrescar_avisa_si_no_se_pudo_ajustar_posadas1(monkeypatch, tmp_path):
+    monkeypatch.setattr(fuentes, '_DIR_MEMORIA', str(tmp_path))
+    monkeypatch.setattr('fuentes_plex.configurada', lambda: True)
+    monkeypatch.setattr('fuentes_plex.cargar', lambda: PLEX)
+    monkeypatch.setattr('fuentes_plex.origen_conexion', lambda: 'replica')
+    monkeypatch.setattr('fuentes_plex.aviso_ajuste',
+                        lambda: 'ajuste de stock de Posadas I sin aplicar (TimeoutError: lento)')
+    monkeypatch.setattr('fuentes_comparador.configurada', lambda: True)
+    monkeypatch.setattr('fuentes_comparador.cargar', lambda: PRECIOS)
+    monkeypatch.setattr('fuentes_quantio.configurada', lambda: False)
+
+    r = fuentes.refrescar_fuentes()
+    assert r['ok'] is True and r['productos'] == 2
+    assert 'Posadas I' in (r['fuentes']['plex']['error'] or '')

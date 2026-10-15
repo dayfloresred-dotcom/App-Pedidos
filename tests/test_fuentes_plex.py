@@ -137,3 +137,83 @@ def test_conn_sin_concentrador_configurado_propaga(monkeypatch):
     monkeypatch.setattr(fuentes_plex, 'PLEX_FALLBACK', CFG_VACIA)
     with pytest.raises(OSError, match='replica caida'):
         fuentes_plex._conn()
+
+
+# --- Ajuste temporal de Posadas I (confirmación duplicada del 15/09) --------
+
+def _stock(sku, suc, cant):
+    return {'sku': sku, 'sucursal': suc, 'cantidad': cant}
+
+
+def _conf(sku, conf, previo, movimientos):
+    return {'sku': sku, 'conf': conf, 'previo': previo, 'movimientos': movimientos}
+
+
+def test_ajuste_posadas1_descuenta_confirmacion_duplicada():
+    """ALPERTAN D: la central dice 117, el Plex de la sucursal 47 (= 117 - 70).
+    Las demás sucursales no se tocan."""
+    rows_stock = [_stock(1, 10, 117), _stock(1, 9, 30), _stock(1, 2, 5)]
+    rows_conf = [_conf(1, 70, 70, 117)]
+    r = fuentes_plex.descontar_confirmacion_duplicada(rows_stock, rows_conf)
+    assert [x['cantidad'] for x in r] == [47, 30, 5]
+    assert rows_stock[0]['cantidad'] == 117  # no modifica la lista recibida
+
+
+def test_ajuste_posadas1_con_diferencia_previa_de_movimientos():
+    """Stock por encima de la suma de movimientos (diferencia vieja de 1-2
+    unidades, ej. LIPIFEN): nadie lo tocó, se ajusta igual."""
+    r = fuentes_plex.descontar_confirmacion_duplicada(
+        [_stock(1, 10, 12)], [_conf(1, 5, 5, 10)])
+    assert r[0]['cantidad'] == 7
+
+
+def test_ajuste_posadas1_se_apaga_si_ajustaron_el_stock():
+    """Stock por debajo de la suma de movimientos: lo corrigieron a mano."""
+    r = fuentes_plex.descontar_confirmacion_duplicada(
+        [_stock(1, 10, 47)], [_conf(1, 70, 70, 117)])
+    assert r[0]['cantidad'] == 47
+
+
+def test_ajuste_posadas1_no_toca_confirmaciones_distintas_al_stock_previo():
+    r = fuentes_plex.descontar_confirmacion_duplicada(
+        [_stock(1, 10, 100)], [_conf(1, 40, 60, 100)])
+    assert r[0]['cantidad'] == 100
+
+
+def test_ajuste_posadas1_llega_al_catalogo_como_posadas_1():
+    rows_prod = [{'sku': 1, 'descripcion': 'ALPERTAN D', 'laboratorio': 'L', 'rubro': 'R', 'troquel': ''}]
+    rows_stock = fuentes_plex.descontar_confirmacion_duplicada(
+        [_stock(1, 10, 117), _stock(1, 9, 30)], [_conf(1, 70, 70, 117)])
+    r = transformar(rows_prod, [], [], rows_stock)
+    assert r['stock']['1'] == {'POSADAS 1': 47, 'POSADAS 2': 30}
+
+
+class _CursorFalso:
+    def __init__(self, falla=False, filas=()):
+        self.falla, self.filas, self.queries = falla, list(filas), []
+
+    def execute(self, q, args=None):
+        self.queries.append(q)
+        if self.falla:
+            raise TimeoutError('lento')
+
+    def fetchall(self):
+        return self.filas
+
+
+def test_ajuste_posadas1_si_la_consulta_falla_no_rompe_y_avisa(monkeypatch):
+    monkeypatch.setattr(fuentes_plex, 'AJUSTE_STOCK_POSADAS1', True)
+    rows = [_stock(1, 10, 117)]
+    assert fuentes_plex._ajustar_posadas1(_CursorFalso(falla=True), rows) == rows
+    assert 'Posadas I' in fuentes_plex.aviso_ajuste()
+    # en la carga siguiente que sale bien, el aviso se limpia
+    fuentes_plex._ajustar_posadas1(_CursorFalso(filas=[_conf(1, 70, 70, 117)]), rows)
+    assert fuentes_plex.aviso_ajuste() is None
+
+
+def test_ajuste_posadas1_apagado_por_env(monkeypatch):
+    monkeypatch.setattr(fuentes_plex, 'AJUSTE_STOCK_POSADAS1', False)
+    cur = _CursorFalso(filas=[_conf(1, 70, 70, 117)])
+    rows = [_stock(1, 10, 117)]
+    assert fuentes_plex._ajustar_posadas1(cur, rows) == rows
+    assert cur.queries == []
