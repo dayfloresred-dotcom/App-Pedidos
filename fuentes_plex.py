@@ -23,7 +23,7 @@ Deltas de nombres validados contra erp_mysql_schema_legacy.md y etl/etl.py
 from datetime import date, timedelta
 
 from config import (PLEX, PLEX_FALLBACK, SUCURSALES, VENTAS_VENTANA_DIAS,
-                    FUENTES_RUBROS, fuente_mysql_configurada)
+                    FUENTES_RUBROS, AJUSTE_STOCK_POSADAS1, fuente_mysql_configurada)
 
 EXCLUIR = {'17', '33'}  # mismo criterio que data_loader
 
@@ -89,6 +89,31 @@ Q_STOCK = """
     WHERE st.IDProducto > 0 AND st.Cantidad IS NOT NULL
 """
 
+# --- AJUSTE TEMPORAL: stock de Posadas I (sucursal 10) ----------------------
+# El 15/09/2026 20:38 la base central registró una segunda "Confirmación de
+# Stock" masiva de Posadas I (28.975 líneas) que repite el stock que ya había:
+# la cantidad confirmada es igual al stock previo, así que la central muestra
+# el doble que el Plex de la sucursal (ALPERTAN D: central 117, sucursal 47 =
+# 117 − 70). Las demás sucursales tienen una sola confirmación (la carga
+# inicial). Mismo ajuste que el portal (comercial-farmacias-red,
+# _lib/ajuste-stock-posadas1.js, PRs #223/#224): se descuenta solo en las
+# líneas seguras — confirmación == suma de movimientos previos y stock >= suma
+# de todos los movimientos — así se apaga solo por producto si borran la línea
+# o ajustan el stock. Entero con AJUSTE_STOCK_POSADAS1=0.
+SUCURSAL_AJUSTE = 10
+
+Q_CONF_DUPLICADA_POSADAS1 = """
+    SELECT c.IDProducto AS sku, c.Cantidad AS conf,
+           SUM(CASE WHEN x.IDMovimiento < c.IDMovimiento THEN x.Cantidad ELSE 0 END) AS previo,
+           SUM(x.Cantidad) AS movimientos
+    FROM stockmovimientos c
+    JOIN stockmovimientos x ON x.Sucursal = c.Sucursal AND x.IDProducto = c.IDProducto
+    WHERE c.Sucursal = 10
+      AND c.Fecha = '2026-09-15' AND c.Hora BETWEEN '20:38:00' AND '20:39:00'
+      AND c.Referencia LIKE 'Confirmaci%' AND c.Cantidad > 0
+    GROUP BY c.IDMovimiento, c.IDProducto, c.Cantidad
+"""
+
 
 def configurada():
     return fuente_mysql_configurada(PLEX)
@@ -128,6 +153,43 @@ def _conn():
 def origen_conexion():
     """'replica' o 'concentrador', según dónde se logró la última conexión."""
     return _origen
+
+
+_aviso_ajuste = None  # error del último ajuste de Posadas I, si falló
+
+
+def aviso_ajuste():
+    """Texto del error si el ajuste de Posadas I no se pudo aplicar en la
+    última carga (el stock de esa sucursal quedó sin corregir)."""
+    return _aviso_ajuste
+
+
+def descontar_confirmacion_duplicada(rows_stock, rows_conf):
+    """Pura: resta al stock de Posadas I las confirmaciones duplicadas seguras.
+    Devuelve una lista nueva; no modifica la recibida."""
+    stock_suc = {}
+    for r in rows_stock:
+        if str(r['sucursal']) == str(SUCURSAL_AJUSTE):
+            sku = str(r['sku'])
+            stock_suc[sku] = stock_suc.get(sku, 0) + float(r['cantidad'] or 0)
+
+    dup = {}
+    for r in rows_conf:
+        sku = str(r['sku'])
+        conf = float(r['conf'] or 0)
+        if (sku in stock_suc and conf == float(r['previo'] or 0)
+                and float(r['movimientos'] or 0) <= stock_suc[sku]):
+            dup[sku] = dup.get(sku, 0) + conf
+    if not dup:
+        return rows_stock
+
+    out = []
+    for r in rows_stock:
+        sku = str(r['sku'])
+        if str(r['sucursal']) == str(SUCURSAL_AJUSTE) and sku in dup:
+            r = {**r, 'cantidad': float(r['cantidad'] or 0) - dup.pop(sku)}
+        out.append(r)
+    return out
 
 
 def _nombre_sucursal(sucursal):
@@ -230,6 +292,23 @@ def cargar():
             rows_ventas = cur.fetchall()
             cur.execute(Q_STOCK)
             rows_stock = cur.fetchall()
+            rows_stock = _ajustar_posadas1(cur, rows_stock)
     finally:
         conn.close()
     return transformar(rows_prod, rows_eans, rows_ventas, rows_stock)
+
+
+def _ajustar_posadas1(cur, rows_stock):
+    """Aplica el ajuste de Posadas I. Si la consulta falla no tira abajo el
+    refresco: el stock queda sin corregir y aviso_ajuste() lo informa (la
+    tarjeta de Plex en admin queda 'Con aviso')."""
+    global _aviso_ajuste
+    _aviso_ajuste = None
+    if not AJUSTE_STOCK_POSADAS1:
+        return rows_stock
+    try:
+        cur.execute(Q_CONF_DUPLICADA_POSADAS1)
+        return descontar_confirmacion_duplicada(rows_stock, cur.fetchall())
+    except Exception as e:
+        _aviso_ajuste = f'ajuste de stock de Posadas I sin aplicar ({type(e).__name__}: {e})'
+        return rows_stock
